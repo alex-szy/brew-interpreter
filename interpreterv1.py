@@ -62,7 +62,7 @@ class Interpreter(InterpreterBase):
 	def do_definition(self, statement_node: Element) -> None:
 		target_var = self.get_target_variable_name(statement_node)
 		if self.var_name_exists(target_var):
-			super().error(ErrorType.FAULT_ERROR, f"Multiple definition of variable '{target_var}'")
+			super().error(ErrorType.NAME_ERROR, f"Multiple definition of variable '{target_var}'")
 		self.variable_name_to_value[target_var] = None
 
 	def is_assignment(self, statement_node: Element) -> bool:
