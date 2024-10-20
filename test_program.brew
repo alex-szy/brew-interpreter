@@ -1,0 +1,9 @@
+func main() {  /* a function that computes the sum of two numbers */
+  var first;
+  var second;
+  first = inputi("Enter a first #: ");
+  second = inputi("Enter a second #: ");
+  sum = (first + second + second - 4);   
+  print("The sum is ", sum, "!");
+
+}

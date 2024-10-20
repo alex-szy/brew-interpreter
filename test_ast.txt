@@ -1,0 +1,59 @@
+program: 
+    structs: [], 
+    functions: [
+        func: 
+            name: main, 
+            args: [], 
+            return_type: None, 
+            statements: [
+                vardef: 
+                    name: first, 
+                    var_type: None, 
+                vardef: 
+                    name: second, 
+                    var_type: None, 
+                =: 
+                    name: first, 
+                    expression: [
+                        fcall: 
+                            name: inputi, 
+                            args: [string: val: Enter a first #: ]
+                    ], 
+                =: 
+                    name: second, 
+                    expression: [
+                        fcall: 
+                            name: inputi, 
+                            args: [string: val: Enter a second #: ]
+                    ], 
+                vardef: 
+                    name: sum, 
+                    var_type: None, 
+                =: 
+                    name: sum, 
+                    expression: [
+                        +: 
+                            op1: [
+                                +: 
+                                    op1: [
+                                        +: 
+                                            op1: [var: name: first], op2: [var: name: second]
+                                    ], 
+                                    op2: [var: name: second]
+                            ], 
+                            op2: [
+                                fcall: 
+                                    name: inputi, 
+                                    args: []
+                            ]
+                    ], 
+                fcall: 
+                    name: print, 
+                    args: [
+                        string: val: The sum is ,
+                        var: 
+                            name: sum, 
+                        string: val: !
+                    ]
+            ]
+    ]
