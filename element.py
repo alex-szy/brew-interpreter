@@ -11,19 +11,20 @@ class Element:
         return self.dict[key]
 
     def __str__(self):
-        s = f"{self.elem_type}: "
+        s = f'"type": "{self.elem_type}", '
         for key, value in self.dict.items():
-            s += key + ": " + self.__val(value) + ", "
+            s += f'"{key}": {self.__val(value)}, '
+
         return s[0:-2]
 
     def __val(self, v):
         if isinstance(v, Element):
-            return "[" + str(v) + "]"
+            return "{" + str(v) + "}"
         if isinstance(v, list):
             s = ""
             for i in v:
-                s += str(i) + ", "
+                s += "{" + str(i) + "}, "
             if len(s) > 0:
                 return "[" + s[0:-2] + "]"
             return "[" + s + "]"
-        return str(v)
+        return f'"{str(v)}"'

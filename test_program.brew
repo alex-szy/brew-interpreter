@@ -1,9 +1,14 @@
 func main() {  /* a function that computes the sum of two numbers */
-  var first;
+  /*var first;
   var second;
   first = inputi("Enter a first #: ");
   second = inputi("Enter a second #: ");
-  sum = (first + second + second - 4);   
-  print("The sum is ", sum, "!");
+  var sum;
+  sum = (first + second);   
+  print("The sum is ", sum, "!"); */
+  foo();
+}
 
+func foo() {
+  print("foo", 3);
 }

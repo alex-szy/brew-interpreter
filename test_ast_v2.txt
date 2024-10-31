@@ -1,0 +1,38 @@
+"type": "program", "structs": [], "functions": [{"type": "func", "name": "main", "args": [], "return_type": "None", "statements": [{"type": "fcall", "name": "foo", "args": []}]}, {"type": "func", "name": "foo", "args": [], "return_type": "None", "statements": [{"type": "fcall", "name": "print", "args": [{"type": "string", "val": "foo"}]}]}]
+{
+    "type": "program",
+    "structs": [],
+    "functions": [
+        {
+            "type": "func",
+            "name": "main",
+            "args": [],
+            "return_type": "None",
+            "statements": [
+                {
+                    "type": "fcall",
+                    "name": "foo",
+                    "args": []
+                }
+            ]
+        },
+        {
+            "type": "func",
+            "name": "foo",
+            "args": [],
+            "return_type": "None",
+            "statements": [
+                {
+                    "type": "fcall",
+                    "name": "print",
+                    "args": [
+                        {
+                            "type": "string",
+                            "val": "foo"
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}
