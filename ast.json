@@ -1,0 +1,204 @@
+{
+    "type": "program",
+    "structs": [],
+    "functions": [
+        {
+            "type": "func",
+            "name": "main",
+            "args": [],
+            "return_type": "None",
+            "statements": [
+                {
+                    "type": "vardef",
+                    "name": "first",
+                    "var_type": "None"
+                },
+                {
+                    "type": "vardef",
+                    "name": "second",
+                    "var_type": "None"
+                },
+                {
+                    "type": "=",
+                    "name": "first",
+                    "expression": {
+                        "type": "fcall",
+                        "name": "inputi",
+                        "args": [
+                            {
+                                "type": "string",
+                                "val": "Enter a first #: "
+                            }
+                        ]
+                    }
+                },
+                {
+                    "type": "=",
+                    "name": "second",
+                    "expression": {
+                        "type": "fcall",
+                        "name": "inputi",
+                        "args": [
+                            {
+                                "type": "string",
+                                "val": "Enter a second #: "
+                            }
+                        ]
+                    }
+                },
+                {
+                    "type": "vardef",
+                    "name": "sum",
+                    "var_type": "None"
+                },
+                {
+                    "type": "=",
+                    "name": "sum",
+                    "expression": {
+                        "type": "+",
+                        "op1": {
+                            "type": "var",
+                            "name": "first"
+                        },
+                        "op2": {
+                            "type": "var",
+                            "name": "second"
+                        }
+                    }
+                },
+                {
+                    "type": "vardef",
+                    "name": "test",
+                    "var_type": "None"
+                },
+                {
+                    "type": "=",
+                    "name": "test",
+                    "expression": {
+                        "type": "fcall",
+                        "name": "foo",
+                        "args": []
+                    }
+                },
+                {
+                    "type": "fcall",
+                    "name": "print",
+                    "args": [
+                        {
+                            "type": "string",
+                            "val": "The negative of the sum is "
+                        },
+                        {
+                            "type": "neg",
+                            "op1": {
+                                "type": "var",
+                                "name": "sum"
+                            }
+                        },
+                        {
+                            "type": "string",
+                            "val": "!"
+                        }
+                    ]
+                },
+                {
+                    "type": "fcall",
+                    "name": "print",
+                    "args": [
+                        {
+                            "type": "var",
+                            "name": "test"
+                        }
+                    ]
+                },
+                {
+                    "type": "fcall",
+                    "name": "print",
+                    "args": [
+                        {
+                            "type": "+",
+                            "op1": {
+                                "type": "string",
+                                "val": "3 is less"
+                            },
+                            "op2": {
+                                "type": "string",
+                                "val": " than 4 is "
+                            }
+                        },
+                        {
+                            "type": "<",
+                            "op1": {
+                                "type": "int",
+                                "val": "3"
+                            },
+                            "op2": {
+                                "type": "int",
+                                "val": "4"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "type": "fcall",
+                    "name": "print",
+                    "args": [
+                        {
+                            "type": "nil"
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "type": "func",
+            "name": "foo",
+            "args": [
+                {
+                    "type": "arg",
+                    "name": "bar",
+                    "var_type": "None"
+                },
+                {
+                    "type": "arg",
+                    "name": "bletch",
+                    "var_type": "None"
+                }
+            ],
+            "return_type": "None",
+            "statements": [
+                {
+                    "type": "fcall",
+                    "name": "print",
+                    "args": [
+                        {
+                            "type": "string",
+                            "val": "blah"
+                        }
+                    ]
+                },
+                {
+                    "type": "return",
+                    "expression": {
+                        "type": "nil"
+                    }
+                }
+            ]
+        },
+        {
+            "type": "func",
+            "name": "foo",
+            "args": [],
+            "return_type": "None",
+            "statements": [
+                {
+                    "type": "return",
+                    "expression": {
+                        "type": "string",
+                        "val": "test"
+                    }
+                }
+            ]
+        }
+    ]
+}

@@ -1,0 +1,25 @@
+
+func main() {  /* a function that computes the sum of two numbers */
+  var first;
+  var second;
+  first = inputi("Enter a first #: ");
+  second = inputi("Enter a second #: ");
+  var sum;
+  sum = (first + second);
+  var test;
+  test = foo();   
+  print("The negative of the sum is ", -sum, "!");
+  print(test);
+  print("3 is less"+" than 4 is ", 3 < 4);
+  print(nil);
+}
+
+func foo(bar, bletch) {
+  print("blah");
+  return nil;
+}
+
+
+func foo(){
+  return "test";
+}

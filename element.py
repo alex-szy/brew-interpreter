@@ -14,7 +14,6 @@ class Element:
         s = f'"type": "{self.elem_type}", '
         for key, value in self.dict.items():
             s += f'"{key}": {self.__val(value)}, '
-
         return s[0:-2]
 
     def __val(self, v):
