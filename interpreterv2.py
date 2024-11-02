@@ -10,13 +10,14 @@ import json
 class Interpreter(InterpreterBase):
     def __init__(self, console_output=True, inp=None, trace_output=False):
         super().__init__(console_output, inp)   # call InterpreterBase's constructor
+        self.scope_manager = ScopeManager()
+        self.ret_flag = False
 
     def run(self, program: str) -> None:
         """
         Main function invoked by the autograder
         """
         self.ast = parse_program(program)         # parse program into AST
-        self.scope_manager = ScopeManager()
         # get_func_node guaranteed to return list with at least 1 element
         self.run_func(self.get_func_node("main")[0], [])
 
@@ -59,8 +60,9 @@ class Interpreter(InterpreterBase):
         scope = {arg.get("name"): value for arg, value in zip(args, evaluated_args)}
         # Push a func level scope into the scope manager
         self.scope_manager.push(True, scope)
-        retval, _ = self.run_statement_block(func_node.get("statements"))
+        retval = self.run_statement_block(func_node.get("statements"))
         self.scope_manager.pop()
+        self.ret_flag = False
         return retval
 
     def do_definition(self, statement_node: Element) -> None:
@@ -122,7 +124,7 @@ class Interpreter(InterpreterBase):
                     error = e
             super().error(ErrorType.NAME_ERROR, str(error))
 
-    def run_statement(self, statement_node: Element) -> tuple[Any, bool]:
+    def run_statement(self, statement_node: Element) -> Any:
         """
         Runs a single statement.
 
@@ -146,12 +148,12 @@ class Interpreter(InterpreterBase):
 
                 self.scope_manager.push(False)
                 if expr:
-                    retval, ret = self.run_statement_block(statement_node.get("statements"))
+                    retval = self.run_statement_block(statement_node.get("statements"))
                 else:
-                    retval, ret = self.run_statement_block(statement_node.get("else_statements"))
+                    retval = self.run_statement_block(statement_node.get("else_statements"))
                 self.scope_manager.pop()
 
-                return retval, ret
+                return retval
             case "for":
                 self.run_statement(statement_node.get("init"))
                 while True:
@@ -162,22 +164,24 @@ class Interpreter(InterpreterBase):
                         break
 
                     self.scope_manager.push(False)
-                    retval, ret = self.run_statement_block(statement_node.get("statements"))
+                    retval = self.run_statement_block(statement_node.get("statements"))
                     self.scope_manager.pop()
 
-                    if ret:
-                        return retval, True
+                    if self.ret_flag:
+                        return retval
                     self.run_statement(statement_node.get("update"))
             case "return":
+                # The order of execution is extremely important.
+                # We need to evaluate the expression before setting the return flag.
+                # Otherwise, the entire function returns upon the next call to run_statement.
                 expr = statement_node.get("expression")
-                if expr is None:
-                    return None, True
-                return self.evaluate_expression(expr), True
+                retval = None if expr is None else self.evaluate_expression(expr)
+                self.ret_flag = True
+                return retval
             case _:
                 raise Exception(f"unsupported statement type: {statement_node.elem_type}")
-        return None, False
 
-    def run_statement_block(self, statement_block: list[Element]) -> tuple[Any, bool]:
+    def run_statement_block(self, statement_block: list[Element]) -> Any:
         """
         Runs a block of statements. If the block contains a (potentially nested) return statement, terminate execution and return the value.
         Else run all the statements and return None.
@@ -187,12 +191,11 @@ class Interpreter(InterpreterBase):
             `ret`: whether or not the block contains a return statement
         """
         if statement_block is None:
-            return None, False
+            return
         for statement_node in statement_block:
-            retval, ret = self.run_statement(statement_node)
-            if ret:
-                return retval, True
-        return None, False
+            retval = self.run_statement(statement_node)
+            if self.ret_flag:
+                return retval
 
     def is_value_node(self, expression_node: Element) -> bool:
         """
