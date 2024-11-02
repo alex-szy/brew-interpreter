@@ -10,94 +10,185 @@
             "statements": [
                 {
                     "type": "vardef",
-                    "name": "first",
+                    "name": "i",
                     "var_type": "None"
                 },
                 {
-                    "type": "vardef",
-                    "name": "second",
-                    "var_type": "None"
-                },
-                {
-                    "type": "=",
-                    "name": "first",
-                    "expression": {
-                        "type": "fcall",
-                        "name": "inputi",
-                        "args": [
-                            {
-                                "type": "string",
-                                "val": "Enter a first #: "
-                            }
-                        ]
-                    }
-                },
-                {
-                    "type": "=",
-                    "name": "second",
-                    "expression": {
-                        "type": "fcall",
-                        "name": "inputi",
-                        "args": [
-                            {
-                                "type": "string",
-                                "val": "Enter a second #: "
-                            }
-                        ]
-                    }
-                },
-                {
-                    "type": "vardef",
-                    "name": "sum",
-                    "var_type": "None"
-                },
-                {
-                    "type": "=",
-                    "name": "sum",
-                    "expression": {
-                        "type": "+",
+                    "type": "for",
+                    "init": {
+                        "type": "=",
+                        "name": "i",
+                        "expression": {
+                            "type": "int",
+                            "val": "0"
+                        }
+                    },
+                    "condition": {
+                        "type": "<",
                         "op1": {
                             "type": "var",
-                            "name": "first"
+                            "name": "i"
                         },
                         "op2": {
-                            "type": "var",
-                            "name": "second"
+                            "type": "int",
+                            "val": "6"
                         }
-                    }
+                    },
+                    "update": {
+                        "type": "=",
+                        "name": "i",
+                        "expression": {
+                            "type": "+",
+                            "op1": {
+                                "type": "var",
+                                "name": "i"
+                            },
+                            "op2": {
+                                "type": "int",
+                                "val": "1"
+                            }
+                        }
+                    },
+                    "statements": [
+                        {
+                            "type": "fcall",
+                            "name": "print",
+                            "args": [
+                                {
+                                    "type": "fcall",
+                                    "name": "climbStairs",
+                                    "args": [
+                                        {
+                                            "type": "var",
+                                            "name": "i"
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
                 },
                 {
-                    "type": "vardef",
-                    "name": "test",
+                    "type": "fcall",
+                    "name": "print",
+                    "args": []
+                },
+                {
+                    "type": "fcall",
+                    "name": "foo",
+                    "args": []
+                },
+                {
+                    "type": "fcall",
+                    "name": "bar",
+                    "args": [
+                        {
+                            "type": "bool",
+                            "val": "False"
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "type": "func",
+            "name": "climbStairs",
+            "args": [
+                {
+                    "type": "arg",
+                    "name": "n",
                     "var_type": "None"
-                },
+                }
+            ],
+            "return_type": "None",
+            "statements": [
                 {
-                    "type": "=",
-                    "name": "test",
-                    "expression": {
-                        "type": "fcall",
-                        "name": "foo",
-                        "args": []
-                    }
-                },
+                    "type": "if",
+                    "condition": {
+                        "type": "<=",
+                        "op1": {
+                            "type": "var",
+                            "name": "n"
+                        },
+                        "op2": {
+                            "type": "int",
+                            "val": "1"
+                        }
+                    },
+                    "statements": [
+                        {
+                            "type": "return",
+                            "expression": {
+                                "type": "int",
+                                "val": "1"
+                            }
+                        }
+                    ],
+                    "else_statements": [
+                        {
+                            "type": "return",
+                            "expression": {
+                                "type": "+",
+                                "op1": {
+                                    "type": "fcall",
+                                    "name": "climbStairs",
+                                    "args": [
+                                        {
+                                            "type": "-",
+                                            "op1": {
+                                                "type": "var",
+                                                "name": "n"
+                                            },
+                                            "op2": {
+                                                "type": "int",
+                                                "val": "1"
+                                            }
+                                        }
+                                    ]
+                                },
+                                "op2": {
+                                    "type": "fcall",
+                                    "name": "climbStairs",
+                                    "args": [
+                                        {
+                                            "type": "-",
+                                            "op1": {
+                                                "type": "var",
+                                                "name": "n"
+                                            },
+                                            "op2": {
+                                                "type": "int",
+                                                "val": "2"
+                                            }
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "type": "func",
+            "name": "foo",
+            "args": [],
+            "return_type": "None",
+            "statements": [
                 {
                     "type": "fcall",
                     "name": "print",
                     "args": [
                         {
-                            "type": "string",
-                            "val": "The negative of the sum is "
-                        },
-                        {
-                            "type": "neg",
+                            "type": "||",
                             "op1": {
-                                "type": "var",
-                                "name": "sum"
+                                "type": "bool",
+                                "val": "True"
+                            },
+                            "op2": {
+                                "type": "bool",
+                                "val": "False"
                             }
-                        },
-                        {
-                            "type": "string",
-                            "val": "!"
                         }
                     ]
                 },
@@ -106,8 +197,108 @@
                     "name": "print",
                     "args": [
                         {
-                            "type": "var",
-                            "name": "test"
+                            "type": "||",
+                            "op1": {
+                                "type": "==",
+                                "op1": {
+                                    "type": "bool",
+                                    "val": "True"
+                                },
+                                "op2": {
+                                    "type": "bool",
+                                    "val": "False"
+                                }
+                            },
+                            "op2": {
+                                "type": "bool",
+                                "val": "True"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "type": "fcall",
+                    "name": "print",
+                    "args": [
+                        {
+                            "type": "/",
+                            "op1": {
+                                "type": "int",
+                                "val": "5"
+                            },
+                            "op2": {
+                                "type": "int",
+                                "val": "3"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "type": "fcall",
+                    "name": "print",
+                    "args": [
+                        {
+                            "type": "neg",
+                            "op1": {
+                                "type": "int",
+                                "val": "6"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "type": "fcall",
+                    "name": "print",
+                    "args": [
+                        {
+                            "type": "!",
+                            "op1": {
+                                "type": "bool",
+                                "val": "True"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "type": "vardef",
+                    "name": "a",
+                    "var_type": "None"
+                },
+                {
+                    "type": "=",
+                    "name": "a",
+                    "expression": {
+                        "type": "int",
+                        "val": "3"
+                    }
+                },
+                {
+                    "type": "vardef",
+                    "name": "b",
+                    "var_type": "None"
+                },
+                {
+                    "type": "=",
+                    "name": "b",
+                    "expression": {
+                        "type": "int",
+                        "val": "3"
+                    }
+                },
+                {
+                    "type": "fcall",
+                    "name": "print",
+                    "args": [
+                        {
+                            "type": ">",
+                            "op1": {
+                                "type": "var",
+                                "name": "a"
+                            },
+                            "op2": {
+                                "type": "var",
+                                "name": "b"
+                            }
                         }
                     ]
                 },
@@ -119,32 +310,12 @@
                             "type": "+",
                             "op1": {
                                 "type": "string",
-                                "val": "3 is less"
+                                "val": "abc"
                             },
                             "op2": {
                                 "type": "string",
-                                "val": " than 4 is "
+                                "val": "def"
                             }
-                        },
-                        {
-                            "type": "<",
-                            "op1": {
-                                "type": "int",
-                                "val": "3"
-                            },
-                            "op2": {
-                                "type": "int",
-                                "val": "4"
-                            }
-                        }
-                    ]
-                },
-                {
-                    "type": "fcall",
-                    "name": "print",
-                    "args": [
-                        {
-                            "type": "nil"
                         }
                     ]
                 }
@@ -152,51 +323,91 @@
         },
         {
             "type": "func",
-            "name": "foo",
+            "name": "bar",
             "args": [
                 {
                     "type": "arg",
-                    "name": "bar",
-                    "var_type": "None"
-                },
-                {
-                    "type": "arg",
-                    "name": "bletch",
+                    "name": "a",
                     "var_type": "None"
                 }
             ],
             "return_type": "None",
             "statements": [
                 {
-                    "type": "fcall",
-                    "name": "print",
-                    "args": [
+                    "type": "if",
+                    "condition": {
+                        "type": "==",
+                        "op1": {
+                            "type": "var",
+                            "name": "a"
+                        },
+                        "op2": {
+                            "type": "bool",
+                            "val": "True"
+                        }
+                    },
+                    "statements": [
                         {
-                            "type": "string",
-                            "val": "blah"
+                            "type": "fcall",
+                            "name": "print",
+                            "args": [
+                                {
+                                    "type": "string",
+                                    "val": "bbb"
+                                }
+                            ]
+                        }
+                    ],
+                    "else_statements": [
+                        {
+                            "type": "if",
+                            "condition": {
+                                "type": "==",
+                                "op1": {
+                                    "type": "var",
+                                    "name": "a"
+                                },
+                                "op2": {
+                                    "type": "int",
+                                    "val": "4"
+                                }
+                            },
+                            "statements": [
+                                {
+                                    "type": "fcall",
+                                    "name": "print",
+                                    "args": [
+                                        {
+                                            "type": "string",
+                                            "val": "444"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "else_statements": [
+                                {
+                                    "type": "if",
+                                    "condition": {
+                                        "type": "var",
+                                        "name": "a"
+                                    },
+                                    "statements": [
+                                        {
+                                            "type": "fcall",
+                                            "name": "print",
+                                            "args": [
+                                                {
+                                                    "type": "string",
+                                                    "val": "blah"
+                                                }
+                                            ]
+                                        }
+                                    ],
+                                    "else_statements": "None"
+                                }
+                            ]
                         }
                     ]
-                },
-                {
-                    "type": "return",
-                    "expression": {
-                        "type": "nil"
-                    }
-                }
-            ]
-        },
-        {
-            "type": "func",
-            "name": "foo",
-            "args": [],
-            "return_type": "None",
-            "statements": [
-                {
-                    "type": "return",
-                    "expression": {
-                        "type": "string",
-                        "val": "test"
-                    }
                 }
             ]
         }
