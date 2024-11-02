@@ -14,7 +14,7 @@ class ScopeManager:
         """
         self.scopes: list[tuple[bool, bool, dict]] = []
 
-    def push(self, func_level: bool, scope: Optional[dict]=None) -> None:
+    def push(self, func_level: bool, scope: Optional[dict] = None) -> None:
         """
         Method to call when entering a new scope.
 
@@ -35,19 +35,20 @@ class ScopeManager:
 
     def vardef(self, name: str) -> bool:
         """
-        Check if variable defined in current scope. Return false if defined. Else define the variable and return true.
+        Check if variable defined in current scope. Return false if defined.
+        Else define the variable and return true.
         """
         _, scope = self.scopes[-1]
         if name in scope:
             return False
         scope[name] = None
         return True
-    
+
     def get_var(self, name: str) -> Any:
         """
         Iterate in reverse through the stack to find the variable.
         Stop when run out of scopes or when hit function-level scope.
-        Either returns a value or raises a KeyError
+        Either returns a value or raises a KeyError.
         """
         for i in range(len(self.scopes)-1, -1, -1):
             func_level, scope = self.scopes[i]
@@ -56,10 +57,11 @@ class ScopeManager:
             if func_level:
                 break
         raise KeyError(name)
-    
+
     def set_var(self, name: str, val: Any) -> None:
         """
-        Same algorithm as get_var. Raises KeyError if variable not found, else sets the variable
+        Same algorithm as get_var.
+        Either sets the variable or raises KeyError if variable not found.
         """
         for i in range(len(self.scopes)-1, -1, -1):
             func_level, scope = self.scopes[i]

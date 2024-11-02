@@ -56,7 +56,7 @@ class Interpreter(InterpreterBase):
         if len(args) != len(evaluated_args):
             raise ArgumentError(f"Function {func_node.get('name')} expected {len(args)} arguments, got {len(evaluated_args)}")
 
-        scope = {arg.get("name"):value for arg, value in zip(args, evaluated_args)}
+        scope = {arg.get("name"): value for arg, value in zip(args, evaluated_args)}
         # Push a func level scope into the scope manager
         self.scope_manager.push(True, scope)
         retval, _ = self.run_statement_block(func_node.get("statements"))
@@ -108,10 +108,10 @@ class Interpreter(InterpreterBase):
                     super().output(str(evaluated_args[0]))
                 case other:
                     super().error(ErrorType.NAME_ERROR, f"Function inputi expected 0 or 1 arguments, got {other}")
-            return int(super().get_input()) if name == "inputi" else super().get_input() # maybe need to throw an error here?                
+            return int(super().get_input()) if name == "inputi" else super().get_input()  # maybe need to throw an error here?
         elif name == "print":
             super().output("".join([self.string_repr(x) for x in evaluated_args]))
-        else: # user defined functions
+        else:  # user defined functions
             # try all the functions we find, execute the first one that matches the args
             for func in self.get_func_node(name):
                 # get_func_node guaranteed to return at least 1 element list
@@ -176,7 +176,7 @@ class Interpreter(InterpreterBase):
             case _:
                 raise Exception(f"unsupported statement type: {statement_node.elem_type}")
         return None, False
-    
+
     def run_statement_block(self, statement_block: list[Element]) -> tuple[Any, bool]:
         """
         Runs a block of statements. If the block contains a (potentially nested) return statement, terminate execution and return the value.
@@ -205,7 +205,7 @@ class Interpreter(InterpreterBase):
 
     def is_binary_operator(self, expression_node: Element) -> bool:
         return "op1" in expression_node.dict and "op2" in expression_node.dict
-    
+
     def is_unary_operator(self, expression_node: Element) -> bool:
         return "op1" in expression_node.dict and "op2" not in expression_node.dict
 
