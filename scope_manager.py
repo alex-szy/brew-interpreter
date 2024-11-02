@@ -12,7 +12,7 @@ class ScopeManager:
         The bool indicates whether this is a function-level scope or block-level scope
         The dict contains mappings to all the variables in that scope
         """
-        self.scopes: list[tuple[bool, bool, dict]] = []
+        self.scopes: list[tuple[bool, dict]] = []
 
     def push(self, func_level: bool, scope: Optional[dict] = None) -> None:
         """
@@ -50,8 +50,7 @@ class ScopeManager:
         Stop when run out of scopes or when hit function-level scope.
         Either returns a value or raises a KeyError.
         """
-        for i in range(len(self.scopes)-1, -1, -1):
-            func_level, scope = self.scopes[i]
+        for func_level, scope in reversed(self.scopes):
             if name in scope:
                 return scope[name]
             if func_level:
@@ -63,8 +62,7 @@ class ScopeManager:
         Same algorithm as get_var.
         Either sets the variable or raises KeyError if variable not found.
         """
-        for i in range(len(self.scopes)-1, -1, -1):
-            func_level, scope = self.scopes[i]
+        for func_level, scope in reversed(self.scopes):
             if name in scope:
                 scope[name] = val
                 return
