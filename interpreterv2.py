@@ -2,7 +2,8 @@ from typing import Any
 from intbase import InterpreterBase, ErrorType
 from element import Element
 from brewparse import parse_program
-from utils import BINARY_OPERATORS, UNARY_OPERATORS, ArgumentError, ScopeManager
+from utils import BINARY_OPERATORS, UNARY_OPERATORS, ArgumentError
+from scope_manager import ScopeManager
 import json
 
 
@@ -44,6 +45,8 @@ class Interpreter(InterpreterBase):
     def run_func(self, func_node: Element, evaluated_args: list) -> None:
         """
         Runs a function. Creates the scope for the function, runs the statements, then pops the scope and returns the return value.
+
+        Raises an ArgumentError if wrong number of parameters was passed.
         """
         assert isinstance(func_node, Element)
         assert func_node.elem_type == "func"
@@ -54,6 +57,7 @@ class Interpreter(InterpreterBase):
             raise ArgumentError(f"Function {func_node.get('name')} expected {len(args)} arguments, got {len(evaluated_args)}")
 
         scope = {arg.get("name"):value for arg, value in zip(args, evaluated_args)}
+        # Push a func level scope into the scope manager
         self.scope_manager.push(True, scope)
         retval, _ = self.run_statement_block(func_node.get("statements"))
         self.scope_manager.pop()
@@ -61,16 +65,16 @@ class Interpreter(InterpreterBase):
 
     def do_definition(self, statement_node: Element) -> None:
         """
-        Cases:
-        1. In scope, defined in current block -> error
-        2. In scope, not defined in current block -> okay, push onto stack
-        3. Not in scope, not defined in current block -> okay, push onto stack
+        Attempt a variable definition. Raise an error if it fails.
         """
         target_var = self.get_target_variable_name(statement_node)
         if not self.scope_manager.vardef(target_var):
             super().error(ErrorType.NAME_ERROR, f"Multiple definition of variable '{target_var}'")
 
     def do_assignment(self, statement_node: Element) -> None:
+        """
+        Attempt to do an assignment. Raise an error if it fails.
+        """
         target_var_name = self.get_target_variable_name(statement_node)
         try:
             self.scope_manager.set_var(target_var_name, self.evaluate_expression(statement_node.get("expression")))
@@ -91,7 +95,8 @@ class Interpreter(InterpreterBase):
 
     def do_func_call(self, statement_node: Element) -> Any:
         """
-        Must return the return value of the fcall
+        Execute a function call statement. The call can either be to a builtin function or a user-defined one.
+        For user-defined functions, attempts to call run_func on all functions which match the name. If none match, raise an error.
         """
         evaluated_args = [self.evaluate_expression(x) for x in statement_node.get("args")]
         name = statement_node.get("name")
@@ -106,7 +111,8 @@ class Interpreter(InterpreterBase):
             return int(super().get_input()) if name == "inputi" else super().get_input() # maybe need to throw an error here?                
         elif name == "print":
             super().output("".join([self.string_repr(x) for x in evaluated_args]))
-        else:
+        else: # user defined functions
+            # try all the functions we find, execute the first one that matches the args
             for func in self.get_func_node(name):
                 # get_func_node guaranteed to return at least 1 element list
                 try:
@@ -119,6 +125,12 @@ class Interpreter(InterpreterBase):
     def run_statement(self, statement_node: Element) -> tuple[Any, bool]:
         """
         Runs a single statement.
+
+        returns:
+            `retval`: the return value of the statement, if any
+            `ret`: whether or not this statement is, or contains a nested return statement
+
+        Only if and for statements can possibly contain nested return statements.
         """
         match statement_node.elem_type:
             case "vardef":
@@ -128,17 +140,18 @@ class Interpreter(InterpreterBase):
             case "fcall":
                 self.do_func_call(statement_node)
             case "if":
-                self.scope_manager.push(False)
                 expr = self.evaluate_expression(statement_node.get("condition"))
                 if not isinstance(expr, bool):
                     super().error(ErrorType.TYPE_ERROR, "Expression in if statement must be of type 'bool'")
+
+                self.scope_manager.push(False)
                 if expr:
                     retval, ret = self.run_statement_block(statement_node.get("statements"))
                 else:
                     retval, ret = self.run_statement_block(statement_node.get("else_statements"))
                 self.scope_manager.pop()
-                if ret:
-                    return retval, True
+
+                return retval, ret
             case "for":
                 self.run_statement(statement_node.get("init"))
                 while True:
@@ -147,12 +160,13 @@ class Interpreter(InterpreterBase):
                         super().error(ErrorType.TYPE_ERROR, "Expression in if statement must be of type 'bool'")
                     if not expr:
                         break
+
                     self.scope_manager.push(False)
                     retval, ret = self.run_statement_block(statement_node.get("statements"))
-                    if ret:
-                        self.scope_manager.pop()
-                        return retval, True
                     self.scope_manager.pop()
+
+                    if ret:
+                        return retval, True
                     self.run_statement(statement_node.get("update"))
             case "return":
                 expr = statement_node.get("expression")
@@ -165,10 +179,12 @@ class Interpreter(InterpreterBase):
     
     def run_statement_block(self, statement_block: list[Element]) -> tuple[Any, bool]:
         """
-        Runs a block of statements. If one is a return statement, terminate execution and return the value.
-        Else run everything and return None.
+        Runs a block of statements. If the block contains a (potentially nested) return statement, terminate execution and return the value.
+        Else run all the statements and return None.
 
-        The only possible calls that can cause us to return originate from nested statement blocks, from if and for blocks.
+        returns:
+            `retval`: the final return value of the block of statements, if any
+            `ret`: whether or not the block contains a return statement
         """
         if statement_block is None:
             return None, False
@@ -194,6 +210,9 @@ class Interpreter(InterpreterBase):
         return "op1" in expression_node.dict and "op2" not in expression_node.dict
 
     def get_value_of_variable(self, variable_node: Element) -> Any:
+        """
+        Attempt to get the value of a variable. Raise an error if it fails.
+        """
         target_var_name = self.get_target_variable_name(variable_node)
         try:
             return self.scope_manager.get_var(target_var_name)
@@ -212,7 +231,7 @@ class Interpreter(InterpreterBase):
 
     def evaluate_binary_operator(self, expression_node: Element) -> Any:
         """
-        Probably need some error checking to see if they're the same type. Needs to evaluate the values of the individual operands first.
+        Evaluates both operands, then performs the correct binary operation on them.
         """
         op1, op2 = [self.evaluate_expression(expression_node.get(x)) for x in ["op1", "op2"]]
         try:
@@ -221,6 +240,9 @@ class Interpreter(InterpreterBase):
             super().error(ErrorType.TYPE_ERROR, str(e))
 
     def evaluate_unary_operator(self, expression_node: Element) -> Any:
+        """
+        Evaluates the operand then performs the correct unary operation on it
+        """
         op1 = self.evaluate_expression(expression_node.get("op1"))
         try:
             return UNARY_OPERATORS[expression_node.elem_type](op1)
