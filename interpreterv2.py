@@ -1,10 +1,10 @@
+import json
 from typing import Any
 from intbase import InterpreterBase, ErrorType
 from element import Element
 from brewparse import parse_program
 from utils import BINARY_OPERATORS, UNARY_OPERATORS, ArgumentError
 from scope_manager import ScopeManager
-import json
 
 
 class Interpreter(InterpreterBase):
@@ -19,14 +19,13 @@ class Interpreter(InterpreterBase):
         """
         self.ast = parse_program(program)         # parse program into AST
         # get_func_node guaranteed to return list with at least 1 element
-        self.run_func(self.get_func_node("main")[0], [])
+        self.run_func(self.get_func_nodes("main")[0], [])
 
-    def get_func_node(self, name: str) -> list[Element]:
+    def get_func_nodes(self, name: str) -> list[Element]:
         """
-        Gets func node of the program by name. Raise error if function not defined.
+        Gets all func nodes that match `name`. Raise error if none are found.
         Returns list with at least 1 element, or throws a NAME_ERROR.
         """
-        assert isinstance(self.ast, Element)
         functions = self.ast.get("functions")
         funclist = []
         for elem in functions:
@@ -36,31 +35,25 @@ class Interpreter(InterpreterBase):
             return funclist
         super().error(ErrorType.NAME_ERROR, f"Function '{name}' is not defined")
 
-    def get_target_variable_name(self, statement_node: Element) -> str:
-        """
-        Gets the target variable of an expression. Function call names do not reference variables.
-        """
-        assert statement_node.elem_type in ["vardef", "=", "var"]
-        return statement_node.get("name")
-
     def run_func(self, func_node: Element, evaluated_args: list) -> None:
         """
         Runs a function. Creates the scope for the function, runs the statements, then pops the scope and returns the return value.
 
         Raises an ArgumentError if wrong number of parameters was passed.
         """
-        assert isinstance(func_node, Element)
-        assert func_node.elem_type == "func"
-
         # Check for correct number of arguments
         args = func_node.get("args")
         if len(args) != len(evaluated_args):
             raise ArgumentError(f"Function {func_node.get('name')} expected {len(args)} arguments, got {len(evaluated_args)}")
 
         scope = {arg.get("name"): value for arg, value in zip(args, evaluated_args)}
-        # Push a func level scope into the scope manager
+        # Push a func level scope for the arguments
         self.scope_manager.push(True, scope)
+        # Push a block level scope for the function body
+        self.scope_manager.push(False)
         retval = self.run_statement_block(func_node.get("statements"))
+        # Pop the 2 scopes we pushed for the function
+        self.scope_manager.pop()
         self.scope_manager.pop()
         self.ret_flag = False
         return retval
@@ -69,7 +62,7 @@ class Interpreter(InterpreterBase):
         """
         Attempt a variable definition. Raise an error if it fails.
         """
-        target_var = self.get_target_variable_name(statement_node)
+        target_var = statement_node.get("name")
         if not self.scope_manager.vardef(target_var):
             super().error(ErrorType.NAME_ERROR, f"Multiple definition of variable '{target_var}'")
 
@@ -77,9 +70,10 @@ class Interpreter(InterpreterBase):
         """
         Attempt to do an assignment. Raise an error if it fails.
         """
-        target_var_name = self.get_target_variable_name(statement_node)
+        target_var_name = statement_node.get("name")
+        evaluated_expr = self.evaluate_expression(statement_node.get("expression"))
         try:
-            self.scope_manager.set_var(target_var_name, self.evaluate_expression(statement_node.get("expression")))
+            self.scope_manager.set_var(target_var_name, evaluated_expr)
         except KeyError:
             super().error(ErrorType.NAME_ERROR, f"Undefined variable '{target_var_name}'")
 
@@ -97,8 +91,10 @@ class Interpreter(InterpreterBase):
 
     def do_func_call(self, statement_node: Element) -> Any:
         """
-        Execute a function call statement. The call can either be to a builtin function or a user-defined one.
-        For user-defined functions, attempts to call run_func on all functions which match the name. If none match, raise an error.
+        Execute a function call statement.
+        The call can either be to a builtin function or a user-defined one.
+        For user-defined functions, attempt to call run_func on all functions which match the name.
+        If none match, raise an error.
         """
         evaluated_args = [self.evaluate_expression(x) for x in statement_node.get("args")]
         name = statement_node.get("name")
@@ -115,7 +111,7 @@ class Interpreter(InterpreterBase):
             super().output("".join([self.string_repr(x) for x in evaluated_args]))
         else:  # user defined functions
             # try all the functions we find, execute the first one that matches the args
-            for func in self.get_func_node(name):
+            for func in self.get_func_nodes(name):
                 # get_func_node guaranteed to return at least 1 element list
                 try:
                     return self.run_func(func, evaluated_args)
@@ -124,15 +120,73 @@ class Interpreter(InterpreterBase):
                     error = e
             super().error(ErrorType.NAME_ERROR, str(error))
 
+    def do_if_statement(self, statement_node: Element) -> Any:
+        """
+        Executes an `if` statement.
+        1. Evaluate the condition.
+        2. Run either one of the 2 statement blocks.
+        """
+        evaluated_expr = self.evaluate_expression(statement_node.get("condition"))
+        if not isinstance(evaluated_expr, bool):
+            super().error(ErrorType.TYPE_ERROR, "Expression must be of type 'bool'")
+
+        # Push a block level scope
+        self.scope_manager.push(False)
+        if evaluated_expr:
+            retval = self.run_statement_block(statement_node.get("statements"))
+        else:
+            retval = self.run_statement_block(statement_node.get("else_statements"))
+        # Pop the scope we pushed
+        self.scope_manager.pop()
+
+        return retval
+    
+    def do_for_statement(self, statement_node: Element) -> Any:
+        """
+        Executes a `for` statement.
+        1. Run the init statement. Enter the loop.
+        2. Evaluate the condition and break out of the loop if false.
+        3. Else, run the statements in the loop.
+        4. If the return flag was set, return the value.
+        5. Otherwise, run the update statement and repeat the loop.
+
+        It is assumed that the init and update statements will not set the return flag under any circumstances.
+        """
+        self.run_statement(statement_node.get("init"))
+        while True:
+            evaluated_expr = self.evaluate_expression(statement_node.get("condition"))
+            if not isinstance(evaluated_expr, bool):
+                super().error(ErrorType.TYPE_ERROR, "Expression must be of type 'bool'")
+            if not evaluated_expr:
+                break
+
+            # Push a block level scope
+            self.scope_manager.push(False)
+            retval = self.run_statement_block(statement_node.get("statements"))
+            # Pop the scope we pushed
+            self.scope_manager.pop()
+
+            if self.ret_flag:
+                return retval
+            self.run_statement(statement_node.get("update"))
+
+    def do_return_statement(self, statement_node: Element) -> Any:
+        """
+        Executes a return statement.
+        1. Evaluate the return expression, if there is one.
+        2. Set the return flag and return the value.
+
+        It is important that the return flag be set only after the expression is evaluated.
+        Otherwise, the function will not finish executing its statements.
+        """
+        expr = statement_node.get("expression")
+        retval = None if expr is None else self.evaluate_expression(expr)
+        self.ret_flag = True
+        return retval
+
     def run_statement(self, statement_node: Element) -> Any:
         """
         Runs a single statement.
-
-        returns:
-            `retval`: the return value of the statement, if any
-            `ret`: whether or not this statement is, or contains a nested return statement
-
-        Only if and for statements can possibly contain nested return statements.
         """
         match statement_node.elem_type:
             case "vardef":
@@ -142,53 +196,17 @@ class Interpreter(InterpreterBase):
             case "fcall":
                 self.do_func_call(statement_node)
             case "if":
-                expr = self.evaluate_expression(statement_node.get("condition"))
-                if not isinstance(expr, bool):
-                    super().error(ErrorType.TYPE_ERROR, "Expression in if statement must be of type 'bool'")
-
-                self.scope_manager.push(False)
-                if expr:
-                    retval = self.run_statement_block(statement_node.get("statements"))
-                else:
-                    retval = self.run_statement_block(statement_node.get("else_statements"))
-                self.scope_manager.pop()
-
-                return retval
+                return self.do_if_statement(statement_node)
             case "for":
-                self.run_statement(statement_node.get("init"))
-                while True:
-                    expr = self.evaluate_expression(statement_node.get("condition"))
-                    if not isinstance(expr, bool):
-                        super().error(ErrorType.TYPE_ERROR, "Expression in if statement must be of type 'bool'")
-                    if not expr:
-                        break
-
-                    self.scope_manager.push(False)
-                    retval = self.run_statement_block(statement_node.get("statements"))
-                    self.scope_manager.pop()
-
-                    if self.ret_flag:
-                        return retval
-                    self.run_statement(statement_node.get("update"))
+                return self.do_for_statement(statement_node)
             case "return":
-                # The order of execution is extremely important.
-                # We need to evaluate the expression before setting the return flag.
-                # Otherwise, the entire function returns upon the next call to run_statement.
-                expr = statement_node.get("expression")
-                retval = None if expr is None else self.evaluate_expression(expr)
-                self.ret_flag = True
-                return retval
-            case _:
-                raise Exception(f"unsupported statement type: {statement_node.elem_type}")
+                return self.do_return_statement(statement_node)
 
     def run_statement_block(self, statement_block: list[Element]) -> Any:
         """
-        Runs a block of statements. If the block contains a (potentially nested) return statement, terminate execution and return the value.
-        Else run all the statements and return None.
-
-        returns:
-            `retval`: the final return value of the block of statements, if any
-            `ret`: whether or not the block contains a return statement
+        Runs a block of statements.
+        After every statement is executed, check the return flag.
+        If it has been set, return the value immediately.
         """
         if statement_block is None:
             return
@@ -197,32 +215,10 @@ class Interpreter(InterpreterBase):
             if self.ret_flag:
                 return retval
 
-    def is_value_node(self, expression_node: Element) -> bool:
-        """
-        A value node is a constant
-        """
-        return "val" in expression_node.dict or expression_node.elem_type == "nil"
-
-    def is_variable_node(self, expression_node: Element) -> bool:
-        return expression_node.elem_type == "var"
-
-    def is_binary_operator(self, expression_node: Element) -> bool:
-        return "op1" in expression_node.dict and "op2" in expression_node.dict
-
-    def is_unary_operator(self, expression_node: Element) -> bool:
-        return "op1" in expression_node.dict and "op2" not in expression_node.dict
-
-    def get_value_of_variable(self, variable_node: Element) -> Any:
-        """
-        Attempt to get the value of a variable. Raise an error if it fails.
-        """
-        target_var_name = self.get_target_variable_name(variable_node)
-        try:
-            return self.scope_manager.get_var(target_var_name)
-        except KeyError:
-            super().error(ErrorType.NAME_ERROR, f"Undefined variable '{target_var_name}'")
-
     def get_value(self, value_node: Element) -> Any:
+        """
+        Get the value of the value node.
+        """
         val = value_node.get("val")
         match value_node.elem_type:
             case "nil":
@@ -231,6 +227,17 @@ class Interpreter(InterpreterBase):
                 return bool(val)
             case _:
                 return val
+
+    def get_value_of_variable(self, variable_node: Element) -> Any:
+        """
+        Attempt to get the value of a variable.
+        Raise an error if variable is not in scope.
+        """
+        target_var_name = variable_node.get("name")
+        try:
+            return self.scope_manager.get_var(target_var_name)
+        except KeyError:
+            super().error(ErrorType.NAME_ERROR, f"Undefined variable '{target_var_name}'")
 
     def evaluate_binary_operator(self, expression_node: Element) -> Any:
         """
@@ -253,13 +260,13 @@ class Interpreter(InterpreterBase):
             super().error(ErrorType.TYPE_ERROR, str(e))
 
     def evaluate_expression(self, expression_node: Element) -> Any:
-        if self.is_value_node(expression_node):
+        if "val" in expression_node.dict or expression_node.elem_type == "nil":
             return self.get_value(expression_node)
-        if self.is_variable_node(expression_node):
+        if expression_node.elem_type == "var":
             return self.get_value_of_variable(expression_node)
-        if self.is_binary_operator(expression_node):
-            return self.evaluate_binary_operator(expression_node)
-        if self.is_unary_operator(expression_node):
+        if "op1" in expression_node.dict:
+            if "op2" in expression_node.dict:
+                return self.evaluate_binary_operator(expression_node)
             return self.evaluate_unary_operator(expression_node)
         if expression_node.elem_type == "fcall":
             return self.do_func_call(expression_node)
