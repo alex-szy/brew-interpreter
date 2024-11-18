@@ -263,7 +263,7 @@ class Interpreter(InterpreterBase):
                 return retval
             self.run_statement(statement_node.get("update"))
 
-    def do_return_statement(self, statement_node: Element) -> Value:
+    def do_return_statement(self, statement_node: Element) -> Optional[Value]:
         """
         Executes a return statement.
         1. Evaluate the return expression, if there is one.
@@ -273,7 +273,7 @@ class Interpreter(InterpreterBase):
         Otherwise, the function will not finish executing its statements.
         """
         expr = statement_node.get("expression")
-        retval = Value(None) if expr is None else self.evaluate_expression(expr)
+        retval = None if expr is None else self.evaluate_expression(expr)
         self.ret_flag = True
         return retval
 
@@ -295,7 +295,7 @@ class Interpreter(InterpreterBase):
             case "return":
                 return self.do_return_statement(statement_node)
 
-    def run_statement_block(self, statement_block: list[Element]) -> Value | None:
+    def run_statement_block(self, statement_block: list[Element]) -> Optional[Value]:
         """
         Runs a block of statements.
         After every statement is executed, check the return flag.
