@@ -86,6 +86,8 @@ def get_binary_operator(op1: Value, op2: Value, op: str) -> Optional[Callable[[V
             return _eq
         case "!=":
             return lambda a, b: Value("bool", not _eq(a, b).data)
+    if op1.type is None or op2.type is None:
+        return None
     sorted_types = tuple(sorted([op1.type, op2.type]))
     if sorted_types not in BINARY_OPERATORS or op not in BINARY_OPERATORS[sorted_types]:
         return None
@@ -94,11 +96,11 @@ def get_binary_operator(op1: Value, op2: Value, op: str) -> Optional[Callable[[V
 
 UNARY_OPERATORS: dict[str, dict[str, Callable[[Value], Value]]] = {
     "bool": {
-        "!": lambda a: Value(a.type, not a.data)
+        "!": lambda a: Value("bool", not a.data)
     },
     "int": {
-        "!": lambda a: Value(a.type, not a.data),
-        "neg": lambda a: Value(a.type, -a.data)
+        "!": lambda a: Value("bool", not a.data),
+        "neg": lambda a: Value("int", -a.data)
     }
 }
 
