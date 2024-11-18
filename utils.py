@@ -101,8 +101,8 @@ BINARY_OPERATORS: dict[tuple[str, str], dict[str, Callable[[Value, Value], Value
         "!=": lambda a, b: Value("bool", a.data != b.data)
     },
     ("struct", "struct"): {
-        "==": lambda a, b: Value("bool", a is b),
-        "!=": lambda a, b: Value("bool", a is not b)
+        "==": lambda a, b: Value("bool", a is b or (a.data is None and b.data is None)),
+        "!=": lambda a, b: Value("bool", a is not b (a.data is not None or b.data is not None))
     }
 }
 
