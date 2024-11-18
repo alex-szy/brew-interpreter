@@ -3,7 +3,7 @@ from typing import Optional
 from intbase import InterpreterBase, ErrorType
 from element import Element
 from brewparse import parse_program
-from utils import get_binary_operator, get_unary_operator, Value
+from utils import get_binary_operator, get_unary_operator, Value, PRIMITIVES
 from scope_manager import ScopeManager
 
 
@@ -30,7 +30,7 @@ class Interpreter(InterpreterBase):
     def do_struct_defs(self, ast: Element) -> None:
         """
         Do the struct definitions and checks the fields if types are valid.
-        Raises ErrorType.TYPE_ERROR otherwise
+        Raises ErrorType.TYPE_ERROR if not.
         """
         self.structs: dict[str, Element] = {}
         for elem in ast.get("structs"):
@@ -38,7 +38,7 @@ class Interpreter(InterpreterBase):
             self.structs[name] = elem
             for field in elem.get("fields"):
                 var_type = field.get("var_type")
-                if not self.is_valid_type(var_type):
+                if not self.type_exists(var_type):
                     super().error(
                         ErrorType.TYPE_ERROR,
                         f"Invalid type for field '{field.get('name')}' in struct '{name}': '{var_type}'"
@@ -47,7 +47,7 @@ class Interpreter(InterpreterBase):
     def do_func_defs(self, ast: Element) -> None:
         """
         Do the function definitions and checks for return types.
-        Raises ErrorType.TYPE_ERROR if a function definition has no return type.
+        Raises ErrorType.TYPE_ERROR if a function definition has no return type or has an invalid argument type.
         """
         self.funcs: dict[str, list[Element]] = {} # dict which maps name to list of functions
         for elem in ast.get("functions"):
@@ -55,14 +55,14 @@ class Interpreter(InterpreterBase):
             ret_type = elem.get("return_type")
             if ret_type is None:
                 super().error(ErrorType.TYPE_ERROR, f"Function '{name}' missing return type")
-            if ret_type != "void" and not self.is_valid_type(ret_type):
+            if ret_type != "void" and not self.type_exists(ret_type):
                 super().error(
                     ErrorType.TYPE_ERROR,
                     f"Invalid return type for function '{name}': '{ret_type}'"
                 )
             for arg in elem.get("args"):
                 var_type = arg.get("var_type")
-                if not self.is_valid_type(var_type):
+                if not self.type_exists(var_type):
                     super().error(
                         ErrorType.TYPE_ERROR,
                         f"Invalid argument type for argument '{arg.get('name')}' in function '{name}': '{var_type}'"
@@ -80,12 +80,48 @@ class Interpreter(InterpreterBase):
         if name not in self.funcs:
             super().error(ErrorType.NAME_ERROR, f"Function '{name}' is not defined")
         return self.funcs[name]
+    
+    def coerce(self, val: Value, dest_type: str, throw: bool) -> Value | tuple[ErrorType, str]:
+        """
+        Attempt to coerce a Value to the destination type.
+        Return the new Value on success.
+        On failure, if throw is True, call super().error immediately.
+        Else return a tuple containing the error and description.
+        """
+        if dest_type == "bool" and val.type in ["int", "bool"]:
+            return Value("bool", bool(val.data))
+        if val.type is None and dest_type in self.structs:
+            return self.default_value(dest_type)
+        error = (
+            ErrorType.TYPE_ERROR,
+            f"Unable to convert value '{str(val)}' of type '{val.type}' to type '{dest_type}'"
+        )
+        if throw:
+            super().error(*error)
+        else:
+            return error
+
+    def default_value(self, type: str) -> Value:
+        """
+        Returns the default value given a type.
+        """
+        if type in self.structs:
+            return Value(type, None)
+        match type:
+            case "string":
+                return Value("string", "")
+            case "int":
+                return Value("int", 0)
+            case "bool":
+                return Value("bool", False)
 
     def run_func(self, func_node: Element, evaluated_args: list[Value]) -> Optional[Value | tuple[ErrorType, str]]:
         """
         Runs a function. Creates the scope for the function, runs the statements, then pops the scope and returns the return value.
 
-        Raises an ArgumentError if wrong number of parameters was passed.
+        Returns a tuple containing an ErrorType and a description of the error, if either the number of arguments is wrong, or the arguments cannot be coerced to the correct type.
+        Returns None if the function has a void return type.
+        Returns a Value otherwise.
         """
         # Check for correct number of arguments
         args: list[Element] = func_node.get("args")
@@ -97,18 +133,15 @@ class Interpreter(InterpreterBase):
         self.scope_manager.push(True)
         for arg, value in zip(args, evaluated_args):
             name, var_type = arg.get("name"), arg.get("var_type")
-            if value.type is None and var_type in self.structs:
-                value = Value(self.structs[var_type])
-            if value.type == "int" and var_type == "bool":
-                value = Value("bool", bool(value.data))
+            # Attempt to coerce all arguments to the correct type
             if var_type != value.type:
-                self.scope_manager.pop()
-                return ErrorType.TYPE_ERROR, f"Function {func_node.get('name')} expected argument {name} of type {var_type}, got {value.type}"
-            if var_type in self.structs:
-                self.scope_manager.def_var(name, self.structs[var_type])
-            else:
-                self.scope_manager.def_var(name, var_type)
-            self.scope_manager.set_var(name, value)
+                value = self.coerce(value, var_type, False)
+                if isinstance(value, tuple):
+                    # Clean up the scope
+                    self.scope_manager.pop()
+                    return value
+            # Define the arguments in scope
+            self.scope_manager.def_var(name, value)
 
         # Push a block level scope for the function body
         self.scope_manager.push(False)
@@ -117,68 +150,92 @@ class Interpreter(InterpreterBase):
         self.scope_manager.pop()
         self.scope_manager.pop()
         self.ret_flag = False
+        
+        # TODO: check for exception flag
 
+        # Check the return value of the function for a valid type
         ret_type = func_node.get("return_type")
-        if ret_type != "void":
-            if retval is None:
-                if ret_type in self.structs:
-                    retval = Value(self.structs[ret_type])
-                else:
-                    retval = Value(ret_type)
-            if retval.type == "int" and ret_type == "bool":
-                retval = Value("bool", bool(retval.data))
-            if retval.type != ret_type and not (retval.type is None and ret_type in self.structs):
+        if ret_type == "void":
+            if retval is not None:
                 super().error(
                     ErrorType.TYPE_ERROR,
-                    f"Bad return type for function {func_node.get('name')}: {retval.type}"
+                    f"Attempted to return non-void value in void function {func_node.get('name')}: {str(retval)}"
                 )
-        if retval is not None and ret_type == "void":
-            super().error(
-                ErrorType.TYPE_ERROR,
-                f"Attempted to return non-void value in void function {func_node.get('name')}: {retval.type}"
-            )
+        else:
+            if retval is None:
+                # No explicit return statement, or used return without expr
+                retval = self.default_value(ret_type)
+            elif retval.type != ret_type:
+                retval = self.coerce(retval, ret_type, True)
         return retval
     
-    def is_valid_type(self, type: str) -> bool:
-        return type in ["bool", "int", "string"] or type in self.structs
+    def type_exists(self, type: str) -> bool:
+        """
+        Returns true if the specified type is a primitive, or a user-defined struct.
+        Returns false otherwise.
+        """
+        return type in PRIMITIVES or type in self.structs
 
     def do_definition(self, statement_node: Element) -> None:
         """
         Attempt a variable definition. Raise an error if it fails.
         """
         target_var, var_type = statement_node.get("name"), statement_node.get("var_type")
-        if not self.is_valid_type(var_type):
+        if not self.type_exists(var_type):
             super().error(
                 ErrorType.TYPE_ERROR,
                 f"Invalid type for '{target_var}': '{var_type}'"
             )
-        if var_type in self.structs:
-            var_type = self.structs[var_type]
-        if not self.scope_manager.def_var(target_var, var_type):
+        if not self.scope_manager.def_var(target_var, self.default_value(var_type)):
             super().error(
                 ErrorType.NAME_ERROR,
                 f"Multiple definition of variable '{target_var}'"
             )
 
+    def get_target_dict(self, name: str) -> tuple[dict[str, Value], str]:
+        """
+        Using the name, attempt to find the variable, and if it's a struct, attempt to find the dict containing the requested value. Returns the dict and the final name used to index the dict and find the value. You can either use the name to reassign the value, or simply return it.
+        """
+        targets = name.split(".")
+        target_var_name = targets[0]
+        scope = self.scope_manager.get_scope_of_var(target_var_name)
+        if scope is None:
+            super().error(
+                ErrorType.NAME_ERROR,
+                f"Undefined variable '{target_var_name}'"
+            )
+        for field in targets[1:]:
+            curr = scope[target_var_name]
+            var_type = curr.type
+            target_var_name = field
+            if var_type not in self.structs:
+                super().error(
+                    ErrorType.TYPE_ERROR,
+                    f"Variable '{target_var_name}' is not a struct type"
+                )
+            elif curr.data is None:
+                super().error(
+                    ErrorType.FAULT_ERROR,
+                    f"Attempted to dereference an uninitialized struct of type '{var_type}': '{target_var_name}'"
+                )
+            elif field not in curr.data:
+                super().error(
+                    ErrorType.NAME_ERROR,
+                    f"Field '{field}' does not exist in struct of type '{var_type}'"
+                )
+            scope = curr.data
+        return scope, target_var_name
+    
     def do_assignment(self, statement_node: Element) -> None:
         """
         Attempt to do an assignment. Raise an error if it fails.
         """
-        target_var_name = statement_node.get("name")
+        scope, target_var_name = self.get_target_dict(statement_node.get("name"))
         evaluated_expr = self.evaluate_expression(statement_node.get("expression"))
-        var = self.scope_manager.get_var(target_var_name)
-        if isinstance(var, tuple): # error message
-            super().error(*var)
-        if evaluated_expr.type == "int" and var.type == "bool":
-            evaluated_expr = Value("bool", bool(evaluated_expr.data))
-        if evaluated_expr.type is None and var.type in self.structs:
-            evaluated_expr = Value(self.structs[var.type])
-        if evaluated_expr.type != var.type:
-            super().error(
-                ErrorType.TYPE_ERROR,
-                f"Cannot assign value of type '{evaluated_expr.type}' to variable of type '{var.type}'"
-            )
-        self.scope_manager.set_var(target_var_name, evaluated_expr)
+        dest_type = scope[target_var_name].type
+        if evaluated_expr.type != dest_type:
+            evaluated_expr = self.coerce(evaluated_expr, dest_type, True)
+        scope[target_var_name] = evaluated_expr      
 
     def do_func_call(self, statement_node: Element) -> Optional[Value]:
         """
@@ -220,10 +277,8 @@ class Interpreter(InterpreterBase):
         2. Run either one of the 2 statement blocks.
         """
         evaluated_expr = self.evaluate_expression(statement_node.get("condition"))
-        if evaluated_expr.type == "int":
-            evaluated_expr = Value("bool", bool(evaluated_expr.data))
         if evaluated_expr.type != "bool":
-            super().error(ErrorType.TYPE_ERROR, "Expression must be of type 'bool'")
+            evaluated_expr = self.coerce(evaluated_expr, "bool", True)
 
         # Push a block level scope
         self.scope_manager.push(False)
@@ -250,10 +305,8 @@ class Interpreter(InterpreterBase):
         self.run_statement(statement_node.get("init"))
         while True:
             evaluated_expr = self.evaluate_expression(statement_node.get("condition"))
-            if evaluated_expr.type == "int":
-                evaluated_expr = Value("bool", bool(evaluated_expr.data))
             if evaluated_expr.type != "bool":
-                super().error(ErrorType.TYPE_ERROR, "Expression must be of type 'bool'")
+                evaluated_expr = self.coerce(evaluated_expr, "bool", True)
             if not evaluated_expr.data:
                 break
 
@@ -318,7 +371,7 @@ class Interpreter(InterpreterBase):
         """
         val = value_node.get("val")
         if value_node.elem_type == "nil":
-            return Value(None)
+            return Value(None, None)
         return Value(value_node.elem_type, val)
 
     def get_value_of_variable(self, variable_node: Element) -> Value:
@@ -326,11 +379,8 @@ class Interpreter(InterpreterBase):
         Attempt to get the value of a variable.
         Raise an error if variable is not in scope.
         """
-        target_var_name = variable_node.get("name")
-        val = self.scope_manager.get_var(target_var_name)
-        if isinstance(val, tuple):
-            super().error(*val)
-        return val
+        scope, target_var_name = self.get_target_dict(variable_node.get("name"))
+        return scope[target_var_name]
 
     def evaluate_binary_operator(self, expression_node: Element) -> Value:
         """
@@ -358,43 +408,37 @@ class Interpreter(InterpreterBase):
             )
         return op(op1)
 
-    def init_new_struct(self, template: Element) -> Value:
+    def init_new_struct(self, struct_type: str) -> Value:
         """
         Given an uninitialized struct, initialize the dict according to the template
         """
-        assert template is not None
-        struct = Value(template)
-        struct.data = {}
-        for field in struct.template.get("fields"):
+        if struct_type not in self.structs:
+            super().error(
+                ErrorType.TYPE_ERROR,
+                f"Undefined struct type '{struct_type}'"
+            )
+        struct = Value(struct_type, {})
+        for field in self.structs[struct_type].get("fields"):
             # We're not going to check for valid types here since the struct definitions are checked before the program starts
-            var_type = field.get("var_type")
-            if var_type in self.structs:
-                struct.data[field.get("name")] = Value(self.structs[var_type])
-            else:
-                struct.data[field.get("name")] = Value(var_type)
+            field_name, var_type = field.get("name"), field.get("var_type")
+            struct.data[field_name] = self.default_value(var_type)
         return struct
 
     def evaluate_expression(self, expression_node: Element) -> Value:
         if "val" in expression_node.dict or expression_node.elem_type == "nil":
             retval = self.get_value(expression_node)
-        if expression_node.elem_type == "var":
+        elif expression_node.elem_type == "var":
             retval = self.get_value_of_variable(expression_node)
-        if "op1" in expression_node.dict:
+        elif "op1" in expression_node.dict:
             if "op2" in expression_node.dict:
                 retval = self.evaluate_binary_operator(expression_node)
             else:
                 retval = self.evaluate_unary_operator(expression_node)
-        if expression_node.elem_type == "fcall":
+        elif expression_node.elem_type == "fcall":
             retval = self.do_func_call(expression_node)
-        if expression_node.elem_type == "new":
+        elif expression_node.elem_type == "new":
             var_type = expression_node.get("var_type")
-            if var_type not in self.structs:
-                super().error(
-                    ErrorType.TYPE_ERROR,
-                    f"Undefined struct type '{var_type}'"
-                )
-            
-            retval = self.init_new_struct(self.structs[var_type])
+            retval = self.init_new_struct(var_type)
         if retval is None:
             super().error(
                 ErrorType.TYPE_ERROR,

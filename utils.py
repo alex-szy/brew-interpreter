@@ -1,23 +1,15 @@
 from typing import Callable, Optional
-from element import Element
 
 
 class Value:
     """
-    Struct object. Stores a template when first created.
-    Dict is None when first created to signify a nil reference.
+    Value object. Has a type and stores data.
+    Struct types store their data in dict form.
+    Kind of like a scope.
     """
-    def __init__(self, template: str | Element | None= None, val = None):
-        assert template in ["bool", "int", "string"] or isinstance(template, Element) or template is None, template
-        if isinstance(template, Element):
-            self.template = template
-            self.type = template.get("name")
-        else:
-            self.type = template
-        if val is None:
-            self.data = default_val(self.type)
-        else:
-            self.data = val
+    def __init__(self, type: Optional[str], data: Optional[dict[str, "Value"] | str | int | bool]):
+        self.type = type
+        self.data = data
 
     def __str__(self):
         match self.type:
@@ -29,34 +21,22 @@ class Value:
                 return str(self.data) if self.data is not None else "nil"
 
 
-def default_val(type: str):
-    match type:
-        case "bool":
-            return False
-        case "int":
-            return 0
-        case "string":
-            return ""
-        case _:
-            return None
-
-
 BINARY_OPERATORS: dict[tuple[str, str], dict[str, Callable[[Value, Value], Value]]] = {
     ("bool", "bool"): {
-        "||": lambda a, b: Value("bool", bool(a.data or b.data)),
-        "&&": lambda a, b: Value("bool", bool(a.data and b.data)),
+        "||": lambda a, b: Value("bool", a.data or b.data),
+        "&&": lambda a, b: Value("bool", a.data and b.data),
         "==": lambda a, b: Value("bool", a.data == b.data),
         "!=": lambda a, b: Value("bool", a.data != b.data)
     },
     ("bool", "int"): {
-        "||": lambda a, b: Value("bool", bool(a.data or b.data)),
-        "&&": lambda a, b: Value("bool", bool(a.data and b.data)),
+        "||": lambda a, b: Value("bool", bool(a.data) or bool(b.data)),
+        "&&": lambda a, b: Value("bool", bool(a.data) and bool(b.data)),
         "==": lambda a, b: Value("bool", bool(a.data) == bool(b.data)),
         "!=": lambda a, b: Value("bool", bool(a.data) != bool(b.data))
     },
     ("bool", "string"): {
         "==": lambda a, b: Value("bool", False),
-        "!=": lambda a, b: Value("bool", False)
+        "!=": lambda a, b: Value("bool", True)
     },
     ("int", "int"): {
         "+": lambda a, b: Value("int", a.data + b.data),
@@ -74,11 +54,11 @@ BINARY_OPERATORS: dict[tuple[str, str], dict[str, Callable[[Value, Value], Value
     },
     ("int", "string"): {
         "==": lambda a, b: Value("bool", False),
-        "!=": lambda a, b: Value("bool", False)
+        "!=": lambda a, b: Value("bool", True)
     },
     ("nil", "nil"): {
-        "==": lambda a, b: Value("bool", a.data is b.data),
-        "!=": lambda a, b: Value("bool", a.data is not b.data)
+        "==": lambda a, b: Value("bool", True),
+        "!=": lambda a, b: Value("bool", False)
     },
     ("nil", "struct"): {
         "==": lambda a, b: Value("bool", a.data is b.data),
@@ -103,23 +83,6 @@ PRIMITIVES = {
 }
 
 
-# The 2 dicts below map a string description of operators to their corresponding functions
-def get_binary_operator(op1: Value, op2: Value, op: str) -> Optional[Callable[[Value, Value], Value]]:
-    type1, type2 = op1.type, op2.type
-    if type1 is None:
-        type1 = "nil"
-    elif type1 not in PRIMITIVES:
-        type1 = "struct"
-    if type2 is None:
-        type2 = "nil"
-    elif type2 not in PRIMITIVES:
-        type2 = "struct"
-    sorted_types = tuple(sorted([type1, type2]))
-    if sorted_types not in BINARY_OPERATORS or op not in BINARY_OPERATORS[sorted_types]:
-        return None
-    return BINARY_OPERATORS[sorted_types][op]
-
-
 UNARY_OPERATORS: dict[str, dict[str, Callable[[Value], Value]]] = {
     "bool": {
         "!": lambda a: Value("bool", not a.data)
@@ -129,6 +92,17 @@ UNARY_OPERATORS: dict[str, dict[str, Callable[[Value], Value]]] = {
         "neg": lambda a: Value("int", -a.data)
     }
 }
+
+
+def get_binary_operator(op1: Value, op2: Value, op: str) -> Optional[Callable[[Value, Value], Value]]:
+    type1 = "nil" if op1.type is None else "struct" if op1.type not in PRIMITIVES else op1.type
+    type2 = "nil" if op2.type is None else "struct" if op2.type not in PRIMITIVES else op2.type
+    if type2 == "struct" and type1 == "struct" and op1.type != op2.type:
+        return None
+    sorted_types = tuple(sorted([type1, type2]))
+    if sorted_types not in BINARY_OPERATORS or op not in BINARY_OPERATORS[sorted_types]:
+        return None
+    return BINARY_OPERATORS[sorted_types][op]
 
 
 def get_unary_operator(op1: Value, op: str) -> Optional[Callable[[Value], Value]]:
