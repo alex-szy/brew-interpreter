@@ -41,19 +41,6 @@ def default_val(type: str):
             return None
 
 
-def _eq(a: Value, b: Value):
-    """
-    Both operands must be of the same type to be considered equal.
-    """
-    if a is b:
-        return Value("bool", True)
-    if a.data is None and b.data is None and (a.type is None or b.type is None): # both nil values and one of them is a nil literal
-        return Value("bool", True)
-    if not a.type == b.type:
-        return Value("bool", False)
-    return Value("bool", a.data == b.data)
-
-
 BINARY_OPERATORS: dict[tuple[str, str], dict[str, Callable[[Value, Value], Value]]] = {
     ("bool", "bool"): {
         "||": lambda a, b: Value("bool", bool(a.data or b.data)),
@@ -81,7 +68,9 @@ BINARY_OPERATORS: dict[tuple[str, str], dict[str, Callable[[Value, Value], Value
         "<": lambda a, b: Value("bool", a.data < b.data),
         "<=": lambda a, b: Value("bool", a.data <= b.data),
         "==": lambda a, b: Value("bool", a.data == b.data),
-        "!=": lambda a, b: Value("bool", a.data != b.data)
+        "!=": lambda a, b: Value("bool", a.data != b.data),
+        "&&": lambda a, b: Value("bool", bool(a.data) and bool(b.data)),
+        "||": lambda a, b: Value("bool", bool(a.data) or bool(b.data))
     },
     ("int", "string"): {
         "==": lambda a, b: Value("bool", False),
@@ -102,9 +91,10 @@ BINARY_OPERATORS: dict[tuple[str, str], dict[str, Callable[[Value, Value], Value
     },
     ("struct", "struct"): {
         "==": lambda a, b: Value("bool", a is b or (a.data is None and b.data is None)),
-        "!=": lambda a, b: Value("bool", a is not b (a.data is not None or b.data is not None))
+        "!=": lambda a, b: Value("bool", not(a is b or (a.data is None and b.data is None)))
     }
 }
+
 
 PRIMITIVES = {
     "bool",
@@ -139,6 +129,7 @@ UNARY_OPERATORS: dict[str, dict[str, Callable[[Value], Value]]] = {
         "neg": lambda a: Value("int", -a.data)
     }
 }
+
 
 def get_unary_operator(op1: Value, op: str) -> Optional[Callable[[Value], Value]]:
     if op1.type not in UNARY_OPERATORS or op not in UNARY_OPERATORS[op1.type]:

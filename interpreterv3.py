@@ -127,7 +127,7 @@ class Interpreter(InterpreterBase):
                     retval = Value(ret_type)
             if retval.type == "int" and ret_type == "bool":
                 retval = Value("bool", bool(retval.data))
-            if retval.type != func_node.get("return_type"):
+            if retval.type != ret_type and not (retval.type is None and ret_type in self.structs):
                 super().error(
                     ErrorType.TYPE_ERROR,
                     f"Bad return type for function {func_node.get('name')}: {retval.type}"
