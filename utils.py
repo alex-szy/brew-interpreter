@@ -2,12 +2,6 @@ from typing import Callable, Optional
 from element import Element
 
 
-class ArgumentError(Exception):
-    """
-    Custom exception class raised only when function is run with wrong number of args.
-    """
-    pass
-
 class Value:
     """
     Struct object. Stores a template when first created.

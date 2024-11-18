@@ -1,9 +1,9 @@
 import json
-from typing import Any, Optional
+from typing import Optional
 from intbase import InterpreterBase, ErrorType
 from element import Element
 from brewparse import parse_program
-from utils import get_binary_operator, get_unary_operator, ArgumentError, Value
+from utils import get_binary_operator, get_unary_operator, Value
 from scope_manager import ScopeManager
 
 
@@ -41,7 +41,7 @@ class Interpreter(InterpreterBase):
                 if not self.is_valid_type(var_type):
                     super().error(
                         ErrorType.TYPE_ERROR,
-                        f"Invalid type for field '{field.get("name")}' in struct '{name}': '{var_type}'"
+                        f"Invalid type for field '{field.get('name')}' in struct '{name}': '{var_type}'"
                     )
 
     def do_func_defs(self, ast: Element) -> None:
@@ -65,7 +65,7 @@ class Interpreter(InterpreterBase):
                 if not self.is_valid_type(var_type):
                     super().error(
                         ErrorType.TYPE_ERROR,
-                        f"Invalid argument type for argument '{arg.get("name")}' in function '{name}': '{var_type}'"
+                        f"Invalid argument type for argument '{arg.get('name')}' in function '{name}': '{var_type}'"
                     )
             if name in self.funcs:
                 self.funcs[name].append(elem)
@@ -81,7 +81,7 @@ class Interpreter(InterpreterBase):
             super().error(ErrorType.NAME_ERROR, f"Function '{name}' is not defined")
         return self.funcs[name]
 
-    def run_func(self, func_node: Element, evaluated_args: list[Value]) -> Value | tuple[ErrorType, str] | None:
+    def run_func(self, func_node: Element, evaluated_args: list[Value]) -> Optional[Value | tuple[ErrorType, str]]:
         """
         Runs a function. Creates the scope for the function, runs the statements, then pops the scope and returns the return value.
 
@@ -126,12 +126,12 @@ class Interpreter(InterpreterBase):
             if retval.type != func_node.get("return_type"):
                 super().error(
                     ErrorType.TYPE_ERROR,
-                    f"Bad return type for function {func_node.get("name")}: {retval.type}"
+                    f"Bad return type for function {func_node.get('name')}: {retval.type}"
                 )
         if retval is not None and ret_type == "void":
             super().error(
                 ErrorType.TYPE_ERROR,
-                f"Attempted to return non-void value in void function {func_node.get("name")}: {retval.type}"
+                f"Attempted to return non-void value in void function {func_node.get('name')}: {retval.type}"
             )
         return retval
     
@@ -209,7 +209,7 @@ class Interpreter(InterpreterBase):
                     return result
             super().error(*result)
 
-    def do_if_statement(self, statement_node: Element) -> Value | None:
+    def do_if_statement(self, statement_node: Element) -> Optional[Value]:
         """
         Executes an `if` statement.
         1. Evaluate the condition.
@@ -232,7 +232,7 @@ class Interpreter(InterpreterBase):
 
         return retval
     
-    def do_for_statement(self, statement_node: Element) -> Value | None:
+    def do_for_statement(self, statement_node: Element) -> Optional[Value]:
         """
         Executes a `for` statement.
         1. Run the init statement. Enter the loop.
@@ -277,7 +277,7 @@ class Interpreter(InterpreterBase):
         self.ret_flag = True
         return retval
 
-    def run_statement(self, statement_node: Element) -> Value | None:
+    def run_statement(self, statement_node: Element) -> Optional[Value]:
         """
         Runs a single statement.
         """
