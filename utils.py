@@ -57,11 +57,19 @@ def _eq(a: Value, b: Value):
 BINARY_OPERATORS: dict[tuple[str, str], dict[str, Callable[[Value, Value], Value]]] = {
     ("bool", "bool"): {
         "||": lambda a, b: Value("bool", bool(a.data or b.data)),
-        "&&": lambda a, b: Value("bool", bool(a.data and b.data))
+        "&&": lambda a, b: Value("bool", bool(a.data and b.data)),
+        "==": lambda a, b: Value("bool", a.data == b.data),
+        "!=": lambda a, b: Value("bool", a.data != b.data)
     },
     ("bool", "int"): {
         "||": lambda a, b: Value("bool", bool(a.data or b.data)),
-        "&&": lambda a, b: Value("bool", bool(a.data and b.data))
+        "&&": lambda a, b: Value("bool", bool(a.data and b.data)),
+        "==": lambda a, b: Value("bool", bool(a.data) == bool(b.data)),
+        "!=": lambda a, b: Value("bool", bool(a.data) != bool(b.data))
+    },
+    ("bool", "string"): {
+        "==": lambda a, b: Value("bool", False),
+        "!=": lambda a, b: Value("bool", False)
     },
     ("int", "int"): {
         "+": lambda a, b: Value("int", a.data + b.data),
@@ -71,24 +79,52 @@ BINARY_OPERATORS: dict[tuple[str, str], dict[str, Callable[[Value, Value], Value
         ">": lambda a, b: Value("bool", a.data > b.data),
         ">=": lambda a, b: Value("bool", a.data >= b.data),
         "<": lambda a, b: Value("bool", a.data < b.data),
-        "<=": lambda a, b: Value("bool", a.data <= b.data)
+        "<=": lambda a, b: Value("bool", a.data <= b.data),
+        "==": lambda a, b: Value("bool", a.data == b.data),
+        "!=": lambda a, b: Value("bool", a.data != b.data)
+    },
+    ("int", "string"): {
+        "==": lambda a, b: Value("bool", False),
+        "!=": lambda a, b: Value("bool", False)
+    },
+    ("nil", "nil"): {
+        "==": lambda a, b: Value("bool", a.data is b.data),
+        "!=": lambda a, b: Value("bool", a.data is not b.data)
+    },
+    ("nil", "struct"): {
+        "==": lambda a, b: Value("bool", a.data is b.data),
+        "!=": lambda a, b: Value("bool", a.data is not b.data)
     },
     ("string", "string"): {
-        "+": lambda a, b: Value("string", a.data + b.data)
+        "+": lambda a, b: Value("string", a.data + b.data),
+        "==": lambda a, b: Value("bool", a.data == b.data),
+        "!=": lambda a, b: Value("bool", a.data != b.data)
+    },
+    ("struct", "struct"): {
+        "==": lambda a, b: Value("bool", a is b),
+        "!=": lambda a, b: Value("bool", a is not b)
     }
+}
+
+PRIMITIVES = {
+    "bool",
+    "int",
+    "string"
 }
 
 
 # The 2 dicts below map a string description of operators to their corresponding functions
 def get_binary_operator(op1: Value, op2: Value, op: str) -> Optional[Callable[[Value, Value], Value]]:
-    match op:
-        case "==":
-            return _eq
-        case "!=":
-            return lambda a, b: Value("bool", not _eq(a, b).data)
-    if op1.type is None or op2.type is None:
-        return None
-    sorted_types = tuple(sorted([op1.type, op2.type]))
+    type1, type2 = op1.type, op2.type
+    if type1 is None:
+        type1 = "nil"
+    elif type1 not in PRIMITIVES:
+        type1 = "struct"
+    if type2 is None:
+        type2 = "nil"
+    elif type2 not in PRIMITIVES:
+        type2 = "struct"
+    sorted_types = tuple(sorted([type1, type2]))
     if sorted_types not in BINARY_OPERATORS or op not in BINARY_OPERATORS[sorted_types]:
         return None
     return BINARY_OPERATORS[sorted_types][op]
