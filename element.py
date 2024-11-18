@@ -11,7 +11,7 @@ class Element:
         return self.dict[key]
 
     def __str__(self):
-        s = f'"type": "{self.elem_type}", '
+        s = f'"elem_type": "{self.elem_type}", '
         for key, value in self.dict.items():
             s += f'"{key}": {self.__val(value)}, '
         return s[0:-2]

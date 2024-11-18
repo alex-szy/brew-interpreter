@@ -1,5 +1,5 @@
-import operator as o
-from typing import Callable
+from typing import Callable, Optional
+from element import Element
 
 
 class ArgumentError(Exception):
@@ -8,102 +8,107 @@ class ArgumentError(Exception):
     """
     pass
 
-
-def _both_ops_nobool(s, op) -> Callable:
+class Value:
     """
-    Both operands must either be integers or strings
+    Struct object. Stores a template when first created.
+    Dict is None when first created to signify a nil reference.
     """
-    def typechecked_op(a, b):
-        if isinstance(a, bool) or isinstance(b, bool):
-            raise TypeError(
-                f"unsupported operand type(s) for {s}, '{type(a).__name__}' and '{type(b).__name__}'"
-            )
-        return op(a, b)
-    return typechecked_op
+    def __init__(self, template: str | Element | None= None, val = None):
+        assert template in ["bool", "int", "string"] or isinstance(template, Element) or template is None, template
+        if isinstance(template, Element):
+            self.template = template
+            self.type = template.get("name")
+        else:
+            self.type = template
+        if val is None:
+            self.data = default_val(self.type)
+        else:
+            self.data = val
+
+    def __str__(self):
+        match self.type:
+            case "bool":
+                return str(self.data).lower()
+            case "int" | "string":
+                return str(self.data)
+            case _:
+                return str(self.data) if self.data is not None else "nil"
 
 
-def _both_ops_int(s, op) -> Callable:
-    """
-    Both operands must be integers
-    """
-    def typechecked_op(a, b):
-        if not type(a) is int or not type(b) is int:
-            raise TypeError(
-                f"unsupported operand type(s) for {s}, '{type(a).__name__}' and '{type(b).__name__}'"
-            )
-        return op(a, b)
-    return typechecked_op
+def default_val(type: str):
+    match type:
+        case "bool":
+            return False
+        case "int":
+            return 0
+        case "string":
+            return ""
+        case _:
+            return None
 
 
-def _both_ops_bool(s, op) -> Callable:
-    """
-    Both operands must be booleans
-    """
-    def typechecked_op(a, b):
-        if not isinstance(a, bool) or not isinstance(b, bool):
-            raise TypeError(
-                f"unsupported operand type(s) for {s}, '{type(a).__name__}' and '{type(b).__name__}'"
-            )
-        return op(a, b)
-    return typechecked_op
-
-
-def _eq(a, b):
+def _eq(a: Value, b: Value):
     """
     Both operands must be of the same type to be considered equal.
     """
-    if not type(a) is type(b):
-        return False
-    return a == b
+    if a is b:
+        return Value("bool", True)
+    if a.data is None and b.data is None and (a.type is None or b.type is None): # both nil values and one of them is a nil literal
+        return Value("bool", True)
+    if not a.type == b.type:
+        return Value("bool", False)
+    return Value("bool", a.data == b.data)
 
 
-def _ne(a, b):
-    """
-    Inverse of _eq.
-    """
-    return not _eq(a, b)
-
-
-def _neg(a) -> int:
-    """
-    Operand must be integer.
-    """
-    if not type(a) is int:
-        raise TypeError(
-            f"bad operand type for unary negation: {type(a).__name__}"
-        )
-    return -a
-
-
-def _not(a) -> bool:
-    """
-    Operand must be boolean.
-    """
-    if not isinstance(a, bool):
-        raise TypeError(
-            f"bad operand type for logical not: {type(a).__name__}"
-        )
-    return not a
+BINARY_OPERATORS: dict[tuple[str, str], dict[str, Callable[[Value, Value], Value]]] = {
+    ("bool", "bool"): {
+        "||": lambda a, b: Value("bool", a.data or b.data),
+        "&&": lambda a, b: Value("bool", a.data and b.data)
+    },
+    ("bool", "int"): {
+        "||": lambda a, b: Value("bool", a.data or b.data),
+        "&&": lambda a, b: Value("bool", a.data and b.data)
+    },
+    ("int", "int"): {
+        "+": lambda a, b: Value("int", a.data + b.data),
+        "-": lambda a, b: Value("int", a.data - b.data),
+        "*": lambda a, b: Value("int", a.data * b.data),
+        "/": lambda a, b: Value("int", a.data // b.data),
+        ">": lambda a, b: Value("bool", a.data > b.data),
+        ">=": lambda a, b: Value("bool", a.data >= b.data),
+        "<": lambda a, b: Value("bool", a.data < b.data),
+        "<=": lambda a, b: Value("bool", a.data <= b.data)
+    },
+    ("string", "string"): {
+        "+": lambda a, b: Value("string", a.data + b.data)
+    }
+}
 
 
 # The 2 dicts below map a string description of operators to their corresponding functions
-BINARY_OPERATORS = {
-    "+": _both_ops_nobool("+", o.add),
-    "-": _both_ops_int("-", o.sub),
-    "*": _both_ops_int("*", o.mul),
-    "/": _both_ops_int("/", o.floordiv),
-    "==": _eq,
-    "!=": _ne,
-    ">": _both_ops_int(">", o.gt),
-    ">=": _both_ops_int(">=", o.ge),
-    "<": _both_ops_int("<", o.lt),
-    "<=": _both_ops_int("<=", o.le),
-    "&&": _both_ops_bool("&&", lambda a, b: a and b),
-    "||": _both_ops_bool("||", lambda a, b: a or b)
-}
+def get_binary_operator(op1: Value, op2: Value, op: str) -> Optional[Callable[[Value, Value], Value]]:
+    match op:
+        case "==":
+            return _eq
+        case "!=":
+            return lambda a, b: Value("bool", not _eq(a, b).data)
+    sorted_types = tuple(sorted([op1.type, op2.type]))
+    if sorted_types not in BINARY_OPERATORS or op not in BINARY_OPERATORS[sorted_types]:
+        return None
+    return BINARY_OPERATORS[sorted_types][op]
 
 
-UNARY_OPERATORS = {
-    "neg": _neg,
-    "!": _not
+UNARY_OPERATORS: dict[str, dict[str, Callable[[Value], Value]]] = {
+    "bool": {
+        "!": lambda a: Value(a.type, not a.data)
+    },
+    "int": {
+        "!": lambda a: Value(a.type, not a.data),
+        "neg": lambda a: Value(a.type, -a.data)
+    }
 }
+
+def get_unary_operator(op1: Value, op: str) -> Optional[Callable[[Value], Value]]:
+    if op1.type not in UNARY_OPERATORS or op not in UNARY_OPERATORS[op1.type]:
+        return None
+    return UNARY_OPERATORS[op1.type][op]

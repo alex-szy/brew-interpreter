@@ -63,7 +63,7 @@ class Interpreter(InterpreterBase):
         Attempt a variable definition. Raise an error if it fails.
         """
         target_var = statement_node.get("name")
-        if not self.scope_manager.vardef(target_var):
+        if not self.scope_manager.def_var(target_var):
             super().error(ErrorType.NAME_ERROR, f"Multiple definition of variable '{target_var}'")
 
     def do_assignment(self, statement_node: Element) -> None:

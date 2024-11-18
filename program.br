@@ -1,36 +1,121 @@
 
-func main() {  /* a function that computes the sum of two numbers */
-  var i;
-  for (i = 0; i < 6; i = i + 1){
-    print(climbStairs(i));
-  }
-  print();
-  foo();
-  bar(false);
+
+struct cat {
+  name: string;
+  scratches: bool;
+  another: cat;
 }
 
-func climbStairs(n) {
+struct person {
+  name: string;
+  age: int;
+  address: string;
+  kitty: cat;
+}
+
+struct list {
+    val: int;
+    next: list;
+}
+
+func cons(val: int, l: list) : list {
+    var h: list;
+    h = new list;
+    h.val = val;
+    h.next = l;
+    return h;
+}
+
+func rev_app(l: list, a: list) : list {
+    if (l == nil) {
+        return a;
+    }
+
+    return rev_app(l.next, cons(l.val, a));
+}
+
+func reverse(l: list) : list {
+    var a: list;
+
+    return rev_app(l, a);
+}
+
+func print_list(l: list): void {
+    var x: list;
+    var n: int;
+    for (x = l; x != nil; x = x.next) {
+        print(x.val);
+        n = n + 1;
+    }
+    print("N=", n);
+}
+
+/*func main() : void {
+    var n: int;
+    var i: int;
+    var l: list;
+    var r: list;
+
+    n = inputi();
+    for (i = n; i; i = i - 1) {
+        var n: int;
+        n = inputi();
+        l = cons(n, l);
+    }
+    r = reverse(l);
+    print_list(r);
+}*/
+
+/*
+*IN*
+8
+1
+2
+3
+4
+5
+6
+7
+8
+*IN*
+*OUT*
+1
+2
+3
+4
+5
+6
+7
+8
+N=8
+*OUT*
+*/
+
+
+
+
+func climbStairs(n: int) : int{
   if (n <= 1){ return 1;}
   else {return climbStairs(n-1) + climbStairs(n-2);}
 }
 
 
-func foo(){
+func foo(): void{
   print(true || false);  /* prints true */
   print(true == false || true); /* prints true */
   print(5/3);            /* prints 1 */
   print(-6);             /* prints -6 */
   print(!true);          /* prints false */
 
-  var a;
+  var a: int;
   a = 3;
-  var b;
+  var b: int;
   b = 3;
   print(a > b);          /* prints false */
   print("abc"+"def");    /* prints abcdef */
 }
 
-func bar(a){
+func bar(a: int): void{
   if (a == true) {
     print("bbb");
   } else {
@@ -42,4 +127,33 @@ func bar(a){
       }
     }
   }
+}
+
+
+func main() : void {
+  if (0) {
+    print("damn");
+  }
+  var n : int;
+  var yoda: cat;
+  if (yoda == nil) {
+    print("fuckkkk");
+  }
+  yoda = new cat;
+  yoda.name = "yoda";
+  yoda.another = new cat;
+  yoda.another.name = "yodaaa";
+  var dayo: cat;
+  dayo = yoda;
+  print(yoda.name);
+  print(dayo.name);
+  print(dayo == yoda);
+  print(yoda.another.name);
+  n = inputi("Enter a number: ");
+  print(fact(n));
+}
+
+func fact(n : int) : int {
+  if (n <= 1) { return 1; }
+  return n * fact(n-1);
 }

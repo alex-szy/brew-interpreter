@@ -1,163 +1,393 @@
 {
-    "type": "program",
-    "structs": [],
-    "functions": [
+    "elem_type": "program",
+    "structs": [
         {
-            "type": "func",
-            "name": "main",
-            "args": [],
-            "return_type": "None",
-            "statements": [
+            "elem_type": "struct",
+            "name": "cat",
+            "fields": [
                 {
-                    "type": "vardef",
-                    "name": "i",
-                    "var_type": "None"
+                    "elem_type": "fielddef",
+                    "name": "name",
+                    "var_type": "string"
                 },
                 {
-                    "type": "for",
-                    "init": {
-                        "type": "=",
-                        "name": "i",
-                        "expression": {
-                            "type": "int",
-                            "val": "0"
-                        }
-                    },
+                    "elem_type": "fielddef",
+                    "name": "scratches",
+                    "var_type": "bool"
+                },
+                {
+                    "elem_type": "fielddef",
+                    "name": "another",
+                    "var_type": "cat"
+                }
+            ]
+        },
+        {
+            "elem_type": "struct",
+            "name": "person",
+            "fields": [
+                {
+                    "elem_type": "fielddef",
+                    "name": "name",
+                    "var_type": "string"
+                },
+                {
+                    "elem_type": "fielddef",
+                    "name": "age",
+                    "var_type": "int"
+                },
+                {
+                    "elem_type": "fielddef",
+                    "name": "address",
+                    "var_type": "string"
+                },
+                {
+                    "elem_type": "fielddef",
+                    "name": "kitty",
+                    "var_type": "cat"
+                }
+            ]
+        },
+        {
+            "elem_type": "struct",
+            "name": "list",
+            "fields": [
+                {
+                    "elem_type": "fielddef",
+                    "name": "val",
+                    "var_type": "int"
+                },
+                {
+                    "elem_type": "fielddef",
+                    "name": "next",
+                    "var_type": "list"
+                }
+            ]
+        }
+    ],
+    "functions": [
+        {
+            "elem_type": "func",
+            "name": "cons",
+            "args": [
+                {
+                    "elem_type": "arg",
+                    "name": "val",
+                    "var_type": "int"
+                },
+                {
+                    "elem_type": "arg",
+                    "name": "l",
+                    "var_type": "list"
+                }
+            ],
+            "return_type": "list",
+            "statements": [
+                {
+                    "elem_type": "vardef",
+                    "name": "h",
+                    "var_type": "list"
+                },
+                {
+                    "elem_type": "=",
+                    "name": "h",
+                    "expression": {
+                        "elem_type": "new",
+                        "var_type": "list"
+                    }
+                },
+                {
+                    "elem_type": "=",
+                    "name": "h.val",
+                    "expression": {
+                        "elem_type": "var",
+                        "name": "val"
+                    }
+                },
+                {
+                    "elem_type": "=",
+                    "name": "h.next",
+                    "expression": {
+                        "elem_type": "var",
+                        "name": "l"
+                    }
+                },
+                {
+                    "elem_type": "return",
+                    "expression": {
+                        "elem_type": "var",
+                        "name": "h"
+                    }
+                }
+            ]
+        },
+        {
+            "elem_type": "func",
+            "name": "rev_app",
+            "args": [
+                {
+                    "elem_type": "arg",
+                    "name": "l",
+                    "var_type": "list"
+                },
+                {
+                    "elem_type": "arg",
+                    "name": "a",
+                    "var_type": "list"
+                }
+            ],
+            "return_type": "list",
+            "statements": [
+                {
+                    "elem_type": "if",
                     "condition": {
-                        "type": "<",
+                        "elem_type": "==",
                         "op1": {
-                            "type": "var",
-                            "name": "i"
+                            "elem_type": "var",
+                            "name": "l"
                         },
                         "op2": {
-                            "type": "int",
-                            "val": "6"
-                        }
-                    },
-                    "update": {
-                        "type": "=",
-                        "name": "i",
-                        "expression": {
-                            "type": "+",
-                            "op1": {
-                                "type": "var",
-                                "name": "i"
-                            },
-                            "op2": {
-                                "type": "int",
-                                "val": "1"
-                            }
+                            "elem_type": "nil"
                         }
                     },
                     "statements": [
                         {
-                            "type": "fcall",
+                            "elem_type": "return",
+                            "expression": {
+                                "elem_type": "var",
+                                "name": "a"
+                            }
+                        }
+                    ],
+                    "else_statements": "None"
+                },
+                {
+                    "elem_type": "return",
+                    "expression": {
+                        "elem_type": "fcall",
+                        "name": "rev_app",
+                        "args": [
+                            {
+                                "elem_type": "var",
+                                "name": "l.next"
+                            },
+                            {
+                                "elem_type": "fcall",
+                                "name": "cons",
+                                "args": [
+                                    {
+                                        "elem_type": "var",
+                                        "name": "l.val"
+                                    },
+                                    {
+                                        "elem_type": "var",
+                                        "name": "a"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                }
+            ]
+        },
+        {
+            "elem_type": "func",
+            "name": "reverse",
+            "args": [
+                {
+                    "elem_type": "arg",
+                    "name": "l",
+                    "var_type": "list"
+                }
+            ],
+            "return_type": "list",
+            "statements": [
+                {
+                    "elem_type": "vardef",
+                    "name": "a",
+                    "var_type": "list"
+                },
+                {
+                    "elem_type": "return",
+                    "expression": {
+                        "elem_type": "fcall",
+                        "name": "rev_app",
+                        "args": [
+                            {
+                                "elem_type": "var",
+                                "name": "l"
+                            },
+                            {
+                                "elem_type": "var",
+                                "name": "a"
+                            }
+                        ]
+                    }
+                }
+            ]
+        },
+        {
+            "elem_type": "func",
+            "name": "print_list",
+            "args": [
+                {
+                    "elem_type": "arg",
+                    "name": "l",
+                    "var_type": "list"
+                }
+            ],
+            "return_type": "void",
+            "statements": [
+                {
+                    "elem_type": "vardef",
+                    "name": "x",
+                    "var_type": "list"
+                },
+                {
+                    "elem_type": "vardef",
+                    "name": "n",
+                    "var_type": "int"
+                },
+                {
+                    "elem_type": "for",
+                    "init": {
+                        "elem_type": "=",
+                        "name": "x",
+                        "expression": {
+                            "elem_type": "var",
+                            "name": "l"
+                        }
+                    },
+                    "condition": {
+                        "elem_type": "!=",
+                        "op1": {
+                            "elem_type": "var",
+                            "name": "x"
+                        },
+                        "op2": {
+                            "elem_type": "nil"
+                        }
+                    },
+                    "update": {
+                        "elem_type": "=",
+                        "name": "x",
+                        "expression": {
+                            "elem_type": "var",
+                            "name": "x.next"
+                        }
+                    },
+                    "statements": [
+                        {
+                            "elem_type": "fcall",
                             "name": "print",
                             "args": [
                                 {
-                                    "type": "fcall",
-                                    "name": "climbStairs",
-                                    "args": [
-                                        {
-                                            "type": "var",
-                                            "name": "i"
-                                        }
-                                    ]
+                                    "elem_type": "var",
+                                    "name": "x.val"
                                 }
                             ]
+                        },
+                        {
+                            "elem_type": "=",
+                            "name": "n",
+                            "expression": {
+                                "elem_type": "+",
+                                "op1": {
+                                    "elem_type": "var",
+                                    "name": "n"
+                                },
+                                "op2": {
+                                    "elem_type": "int",
+                                    "val": "1"
+                                }
+                            }
                         }
                     ]
                 },
                 {
-                    "type": "fcall",
+                    "elem_type": "fcall",
                     "name": "print",
-                    "args": []
-                },
-                {
-                    "type": "fcall",
-                    "name": "foo",
-                    "args": []
-                },
-                {
-                    "type": "fcall",
-                    "name": "bar",
                     "args": [
                         {
-                            "type": "bool",
-                            "val": "False"
+                            "elem_type": "string",
+                            "val": "N="
+                        },
+                        {
+                            "elem_type": "var",
+                            "name": "n"
                         }
                     ]
                 }
             ]
         },
         {
-            "type": "func",
+            "elem_type": "func",
             "name": "climbStairs",
             "args": [
                 {
-                    "type": "arg",
+                    "elem_type": "arg",
                     "name": "n",
-                    "var_type": "None"
+                    "var_type": "int"
                 }
             ],
-            "return_type": "None",
+            "return_type": "int",
             "statements": [
                 {
-                    "type": "if",
+                    "elem_type": "if",
                     "condition": {
-                        "type": "<=",
+                        "elem_type": "<=",
                         "op1": {
-                            "type": "var",
+                            "elem_type": "var",
                             "name": "n"
                         },
                         "op2": {
-                            "type": "int",
+                            "elem_type": "int",
                             "val": "1"
                         }
                     },
                     "statements": [
                         {
-                            "type": "return",
+                            "elem_type": "return",
                             "expression": {
-                                "type": "int",
+                                "elem_type": "int",
                                 "val": "1"
                             }
                         }
                     ],
                     "else_statements": [
                         {
-                            "type": "return",
+                            "elem_type": "return",
                             "expression": {
-                                "type": "+",
+                                "elem_type": "+",
                                 "op1": {
-                                    "type": "fcall",
+                                    "elem_type": "fcall",
                                     "name": "climbStairs",
                                     "args": [
                                         {
-                                            "type": "-",
+                                            "elem_type": "-",
                                             "op1": {
-                                                "type": "var",
+                                                "elem_type": "var",
                                                 "name": "n"
                                             },
                                             "op2": {
-                                                "type": "int",
+                                                "elem_type": "int",
                                                 "val": "1"
                                             }
                                         }
                                     ]
                                 },
                                 "op2": {
-                                    "type": "fcall",
+                                    "elem_type": "fcall",
                                     "name": "climbStairs",
                                     "args": [
                                         {
-                                            "type": "-",
+                                            "elem_type": "-",
                                             "op1": {
-                                                "type": "var",
+                                                "elem_type": "var",
                                                 "name": "n"
                                             },
                                             "op2": {
-                                                "type": "int",
+                                                "elem_type": "int",
                                                 "val": "2"
                                             }
                                         }
@@ -170,150 +400,150 @@
             ]
         },
         {
-            "type": "func",
+            "elem_type": "func",
             "name": "foo",
             "args": [],
-            "return_type": "None",
+            "return_type": "void",
             "statements": [
                 {
-                    "type": "fcall",
+                    "elem_type": "fcall",
                     "name": "print",
                     "args": [
                         {
-                            "type": "||",
+                            "elem_type": "||",
                             "op1": {
-                                "type": "bool",
+                                "elem_type": "bool",
                                 "val": "True"
                             },
                             "op2": {
-                                "type": "bool",
+                                "elem_type": "bool",
                                 "val": "False"
                             }
                         }
                     ]
                 },
                 {
-                    "type": "fcall",
+                    "elem_type": "fcall",
                     "name": "print",
                     "args": [
                         {
-                            "type": "||",
+                            "elem_type": "||",
                             "op1": {
-                                "type": "==",
+                                "elem_type": "==",
                                 "op1": {
-                                    "type": "bool",
+                                    "elem_type": "bool",
                                     "val": "True"
                                 },
                                 "op2": {
-                                    "type": "bool",
+                                    "elem_type": "bool",
                                     "val": "False"
                                 }
                             },
                             "op2": {
-                                "type": "bool",
+                                "elem_type": "bool",
                                 "val": "True"
                             }
                         }
                     ]
                 },
                 {
-                    "type": "fcall",
+                    "elem_type": "fcall",
                     "name": "print",
                     "args": [
                         {
-                            "type": "/",
+                            "elem_type": "/",
                             "op1": {
-                                "type": "int",
+                                "elem_type": "int",
                                 "val": "5"
                             },
                             "op2": {
-                                "type": "int",
+                                "elem_type": "int",
                                 "val": "3"
                             }
                         }
                     ]
                 },
                 {
-                    "type": "fcall",
+                    "elem_type": "fcall",
                     "name": "print",
                     "args": [
                         {
-                            "type": "neg",
+                            "elem_type": "neg",
                             "op1": {
-                                "type": "int",
+                                "elem_type": "int",
                                 "val": "6"
                             }
                         }
                     ]
                 },
                 {
-                    "type": "fcall",
+                    "elem_type": "fcall",
                     "name": "print",
                     "args": [
                         {
-                            "type": "!",
+                            "elem_type": "!",
                             "op1": {
-                                "type": "bool",
+                                "elem_type": "bool",
                                 "val": "True"
                             }
                         }
                     ]
                 },
                 {
-                    "type": "vardef",
+                    "elem_type": "vardef",
                     "name": "a",
-                    "var_type": "None"
+                    "var_type": "int"
                 },
                 {
-                    "type": "=",
+                    "elem_type": "=",
                     "name": "a",
                     "expression": {
-                        "type": "int",
+                        "elem_type": "int",
                         "val": "3"
                     }
                 },
                 {
-                    "type": "vardef",
+                    "elem_type": "vardef",
                     "name": "b",
-                    "var_type": "None"
+                    "var_type": "int"
                 },
                 {
-                    "type": "=",
+                    "elem_type": "=",
                     "name": "b",
                     "expression": {
-                        "type": "int",
+                        "elem_type": "int",
                         "val": "3"
                     }
                 },
                 {
-                    "type": "fcall",
+                    "elem_type": "fcall",
                     "name": "print",
                     "args": [
                         {
-                            "type": ">",
+                            "elem_type": ">",
                             "op1": {
-                                "type": "var",
+                                "elem_type": "var",
                                 "name": "a"
                             },
                             "op2": {
-                                "type": "var",
+                                "elem_type": "var",
                                 "name": "b"
                             }
                         }
                     ]
                 },
                 {
-                    "type": "fcall",
+                    "elem_type": "fcall",
                     "name": "print",
                     "args": [
                         {
-                            "type": "+",
+                            "elem_type": "+",
                             "op1": {
-                                "type": "string",
+                                "elem_type": "string",
                                 "val": "abc"
                             },
                             "op2": {
-                                "type": "string",
+                                "elem_type": "string",
                                 "val": "def"
                             }
                         }
@@ -322,37 +552,37 @@
             ]
         },
         {
-            "type": "func",
+            "elem_type": "func",
             "name": "bar",
             "args": [
                 {
-                    "type": "arg",
+                    "elem_type": "arg",
                     "name": "a",
-                    "var_type": "None"
+                    "var_type": "int"
                 }
             ],
-            "return_type": "None",
+            "return_type": "void",
             "statements": [
                 {
-                    "type": "if",
+                    "elem_type": "if",
                     "condition": {
-                        "type": "==",
+                        "elem_type": "==",
                         "op1": {
-                            "type": "var",
+                            "elem_type": "var",
                             "name": "a"
                         },
                         "op2": {
-                            "type": "bool",
+                            "elem_type": "bool",
                             "val": "True"
                         }
                     },
                     "statements": [
                         {
-                            "type": "fcall",
+                            "elem_type": "fcall",
                             "name": "print",
                             "args": [
                                 {
-                                    "type": "string",
+                                    "elem_type": "string",
                                     "val": "bbb"
                                 }
                             ]
@@ -360,25 +590,25 @@
                     ],
                     "else_statements": [
                         {
-                            "type": "if",
+                            "elem_type": "if",
                             "condition": {
-                                "type": "==",
+                                "elem_type": "==",
                                 "op1": {
-                                    "type": "var",
+                                    "elem_type": "var",
                                     "name": "a"
                                 },
                                 "op2": {
-                                    "type": "int",
+                                    "elem_type": "int",
                                     "val": "4"
                                 }
                             },
                             "statements": [
                                 {
-                                    "type": "fcall",
+                                    "elem_type": "fcall",
                                     "name": "print",
                                     "args": [
                                         {
-                                            "type": "string",
+                                            "elem_type": "string",
                                             "val": "444"
                                         }
                                     ]
@@ -386,18 +616,18 @@
                             ],
                             "else_statements": [
                                 {
-                                    "type": "if",
+                                    "elem_type": "if",
                                     "condition": {
-                                        "type": "var",
+                                        "elem_type": "var",
                                         "name": "a"
                                     },
                                     "statements": [
                                         {
-                                            "type": "fcall",
+                                            "elem_type": "fcall",
                                             "name": "print",
                                             "args": [
                                                 {
-                                                    "type": "string",
+                                                    "elem_type": "string",
                                                     "val": "blah"
                                                 }
                                             ]
@@ -408,6 +638,257 @@
                             ]
                         }
                     ]
+                }
+            ]
+        },
+        {
+            "elem_type": "func",
+            "name": "main",
+            "args": [],
+            "return_type": "void",
+            "statements": [
+                {
+                    "elem_type": "if",
+                    "condition": {
+                        "elem_type": "int",
+                        "val": "0"
+                    },
+                    "statements": [
+                        {
+                            "elem_type": "fcall",
+                            "name": "print",
+                            "args": [
+                                {
+                                    "elem_type": "string",
+                                    "val": "damn"
+                                }
+                            ]
+                        }
+                    ],
+                    "else_statements": "None"
+                },
+                {
+                    "elem_type": "vardef",
+                    "name": "n",
+                    "var_type": "int"
+                },
+                {
+                    "elem_type": "vardef",
+                    "name": "yoda",
+                    "var_type": "cat"
+                },
+                {
+                    "elem_type": "if",
+                    "condition": {
+                        "elem_type": "==",
+                        "op1": {
+                            "elem_type": "var",
+                            "name": "yoda"
+                        },
+                        "op2": {
+                            "elem_type": "nil"
+                        }
+                    },
+                    "statements": [
+                        {
+                            "elem_type": "fcall",
+                            "name": "print",
+                            "args": [
+                                {
+                                    "elem_type": "string",
+                                    "val": "fuckkkk"
+                                }
+                            ]
+                        }
+                    ],
+                    "else_statements": "None"
+                },
+                {
+                    "elem_type": "=",
+                    "name": "yoda",
+                    "expression": {
+                        "elem_type": "new",
+                        "var_type": "cat"
+                    }
+                },
+                {
+                    "elem_type": "=",
+                    "name": "yoda.name",
+                    "expression": {
+                        "elem_type": "string",
+                        "val": "yoda"
+                    }
+                },
+                {
+                    "elem_type": "=",
+                    "name": "yoda.another",
+                    "expression": {
+                        "elem_type": "new",
+                        "var_type": "cat"
+                    }
+                },
+                {
+                    "elem_type": "=",
+                    "name": "yoda.another.name",
+                    "expression": {
+                        "elem_type": "string",
+                        "val": "yodaaa"
+                    }
+                },
+                {
+                    "elem_type": "vardef",
+                    "name": "dayo",
+                    "var_type": "cat"
+                },
+                {
+                    "elem_type": "=",
+                    "name": "dayo",
+                    "expression": {
+                        "elem_type": "var",
+                        "name": "yoda"
+                    }
+                },
+                {
+                    "elem_type": "fcall",
+                    "name": "print",
+                    "args": [
+                        {
+                            "elem_type": "var",
+                            "name": "yoda.name"
+                        }
+                    ]
+                },
+                {
+                    "elem_type": "fcall",
+                    "name": "print",
+                    "args": [
+                        {
+                            "elem_type": "var",
+                            "name": "dayo.name"
+                        }
+                    ]
+                },
+                {
+                    "elem_type": "fcall",
+                    "name": "print",
+                    "args": [
+                        {
+                            "elem_type": "==",
+                            "op1": {
+                                "elem_type": "var",
+                                "name": "dayo"
+                            },
+                            "op2": {
+                                "elem_type": "var",
+                                "name": "yoda"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "elem_type": "fcall",
+                    "name": "print",
+                    "args": [
+                        {
+                            "elem_type": "var",
+                            "name": "yoda.another.name"
+                        }
+                    ]
+                },
+                {
+                    "elem_type": "=",
+                    "name": "n",
+                    "expression": {
+                        "elem_type": "fcall",
+                        "name": "inputi",
+                        "args": [
+                            {
+                                "elem_type": "string",
+                                "val": "Enter a number: "
+                            }
+                        ]
+                    }
+                },
+                {
+                    "elem_type": "fcall",
+                    "name": "print",
+                    "args": [
+                        {
+                            "elem_type": "fcall",
+                            "name": "fact",
+                            "args": [
+                                {
+                                    "elem_type": "var",
+                                    "name": "n"
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "elem_type": "func",
+            "name": "fact",
+            "args": [
+                {
+                    "elem_type": "arg",
+                    "name": "n",
+                    "var_type": "int"
+                }
+            ],
+            "return_type": "int",
+            "statements": [
+                {
+                    "elem_type": "if",
+                    "condition": {
+                        "elem_type": "<=",
+                        "op1": {
+                            "elem_type": "var",
+                            "name": "n"
+                        },
+                        "op2": {
+                            "elem_type": "int",
+                            "val": "1"
+                        }
+                    },
+                    "statements": [
+                        {
+                            "elem_type": "return",
+                            "expression": {
+                                "elem_type": "int",
+                                "val": "1"
+                            }
+                        }
+                    ],
+                    "else_statements": "None"
+                },
+                {
+                    "elem_type": "return",
+                    "expression": {
+                        "elem_type": "*",
+                        "op1": {
+                            "elem_type": "var",
+                            "name": "n"
+                        },
+                        "op2": {
+                            "elem_type": "fcall",
+                            "name": "fact",
+                            "args": [
+                                {
+                                    "elem_type": "-",
+                                    "op1": {
+                                        "elem_type": "var",
+                                        "name": "n"
+                                    },
+                                    "op2": {
+                                        "elem_type": "int",
+                                        "val": "1"
+                                    }
+                                }
+                            ]
+                        }
+                    }
                 }
             ]
         }
