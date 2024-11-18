@@ -97,7 +97,11 @@ class Interpreter(InterpreterBase):
         self.scope_manager.push(True)
         for arg, value in zip(args, evaluated_args):
             name, var_type = arg.get("name"), arg.get("var_type")
-            if arg.get("var_type") != value.type:
+            if value.type is None and var_type in self.structs:
+                value = Value(self.structs[var_type])
+            if value.type == "int" and var_type == "bool":
+                value = Value("bool", bool(value.data))
+            if var_type != value.type:
                 self.scope_manager.pop()
                 return ErrorType.TYPE_ERROR, f"Function {func_node.get('name')} expected argument {name} of type {var_type}, got {value.type}"
             if var_type in self.structs:
@@ -204,7 +208,7 @@ class Interpreter(InterpreterBase):
             # try all the functions we find, execute the first one that matches the args
             for func in self.get_func_nodes(name):
                 # get_func_node guaranteed to return at least 1 element list
-                result =  self.run_func(func, evaluated_args)
+                result = self.run_func(func, evaluated_args)
                 if not isinstance(result, tuple):
                     return result
             super().error(*result)

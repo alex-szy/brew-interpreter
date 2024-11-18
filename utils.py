@@ -56,12 +56,12 @@ def _eq(a: Value, b: Value):
 
 BINARY_OPERATORS: dict[tuple[str, str], dict[str, Callable[[Value, Value], Value]]] = {
     ("bool", "bool"): {
-        "||": lambda a, b: Value("bool", a.data or b.data),
-        "&&": lambda a, b: Value("bool", a.data and b.data)
+        "||": lambda a, b: Value("bool", bool(a.data or b.data)),
+        "&&": lambda a, b: Value("bool", bool(a.data and b.data))
     },
     ("bool", "int"): {
-        "||": lambda a, b: Value("bool", a.data or b.data),
-        "&&": lambda a, b: Value("bool", a.data and b.data)
+        "||": lambda a, b: Value("bool", bool(a.data or b.data)),
+        "&&": lambda a, b: Value("bool", bool(a.data and b.data))
     },
     ("int", "int"): {
         "+": lambda a, b: Value("int", a.data + b.data),
