@@ -1,4 +1,5 @@
-from typing import Optional, Any
+from typing import Optional
+from utils import Value
 
 
 class ScopeManager:
@@ -12,9 +13,9 @@ class ScopeManager:
         The bool indicates whether this is a function-level scope or block-level scope
         The dict contains mappings to all the variables in that scope
         """
-        self.scopes: list[tuple[bool, dict]] = []
+        self.scopes: list[tuple[bool, dict[str, Value]]] = []
 
-    def push(self, func_level: bool, scope: Optional[dict] = None) -> None:
+    def push(self, func_level: bool, scope: Optional[dict[str, Value]] = None) -> None:
         """
         Method to call when entering a new scope.
 
@@ -33,7 +34,7 @@ class ScopeManager:
         """
         self.scopes.pop()
 
-    def vardef(self, name: str) -> bool:
+    def def_var(self, name: str) -> bool:
         """
         Check if variable defined in current scope. Return false if defined.
         Else define the variable and return true.
@@ -41,31 +42,18 @@ class ScopeManager:
         _, scope = self.scopes[-1]
         if name in scope:
             return False
-        scope[name] = None
+        scope[name] = Value("nil", None)
         return True
 
-    def get_var(self, name: str) -> Any:
+    def get_scope_of_var(self, name: str) -> Optional[dict[str, Value]]:
         """
         Iterate in reverse through the stack to find the variable.
         Stop when run out of scopes or when hit function-level scope.
-        Either returns a value or raises a KeyError.
+        Returns None if variable not found
         """
         for func_level, scope in reversed(self.scopes):
             if name in scope:
-                return scope[name]
+                return scope
             if func_level:
                 break
-        raise KeyError(name)
-
-    def set_var(self, name: str, val: Any) -> None:
-        """
-        Same algorithm as get_var.
-        Either sets the variable or raises KeyError if variable not found.
-        """
-        for func_level, scope in reversed(self.scopes):
-            if name in scope:
-                scope[name] = val
-                return
-            if func_level:
-                break
-        raise KeyError(name)
+        return None
