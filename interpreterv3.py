@@ -1,4 +1,5 @@
 import json
+from copy import deepcopy
 from typing import Optional
 from intbase import InterpreterBase, ErrorType
 from element import Element
@@ -32,17 +33,18 @@ class Interpreter(InterpreterBase):
         Do the struct definitions and checks the fields if types are valid.
         Raises ErrorType.TYPE_ERROR if not.
         """
-        self.structs: dict[str, Element] = {}
+        self.structs: dict[str, Value] = {}
         for elem in ast.get("structs"):
             name = elem.get("name")
-            self.structs[name] = elem
+            self.structs[name] = Value(name, {})
             for field in elem.get("fields"):
-                var_type = field.get("var_type")
+                field_name, var_type = field.get("name"), field.get("var_type")
                 if not self.type_exists(var_type):
                     super().error(
                         ErrorType.TYPE_ERROR,
-                        f"Invalid type for field '{field.get('name')}' in struct '{name}': '{var_type}'"
+                        f"Invalid type for field '{field_name}' in struct '{name}': '{var_type}'"
                     )
+                self.structs[name].data[field_name] = self.default_value(var_type)
 
     def do_func_defs(self, ast: Element) -> None:
         """
@@ -137,7 +139,7 @@ class Interpreter(InterpreterBase):
             if var_type != value.type:
                 value = self.coerce(value, var_type, False)
                 if isinstance(value, tuple):
-                    # Clean up the scope
+                    # Clean up the scope on error
                     self.scope_manager.pop()
                     return value
             # Define the arguments in scope
@@ -197,34 +199,34 @@ class Interpreter(InterpreterBase):
         Using the name, attempt to find the variable, and if it's a struct, attempt to find the dict containing the requested value. Returns the dict and the final name used to index the dict and find the value. You can either use the name to reassign the value, or simply return it.
         """
         targets = name.split(".")
-        target_var_name = targets[0]
-        scope = self.scope_manager.get_scope_of_var(target_var_name)
+        context = targets[0:1]
+        scope = self.scope_manager.get_scope_of_var(context[-1])
         if scope is None:
             super().error(
                 ErrorType.NAME_ERROR,
-                f"Undefined variable '{target_var_name}'"
+                f"Undefined variable '{context[-1]}'"
             )
         for field in targets[1:]:
-            curr = scope[target_var_name]
+            curr = scope[context[-1]]
             var_type = curr.type
-            target_var_name = field
             if var_type not in self.structs:
                 super().error(
                     ErrorType.TYPE_ERROR,
-                    f"Variable '{target_var_name}' is not a struct type"
+                    f"Variable '{'.'.join(context)}' is not a struct type"
                 )
             elif curr.data is None:
                 super().error(
                     ErrorType.FAULT_ERROR,
-                    f"Attempted to dereference an uninitialized struct of type '{var_type}': '{target_var_name}'"
+                    f"Attempted to dereference an uninitialized struct '{'.'.join(context)}' of type '{var_type}'"
                 )
             elif field not in curr.data:
                 super().error(
                     ErrorType.NAME_ERROR,
-                    f"Field '{field}' does not exist in struct of type '{var_type}'"
+                    f"Struct '{'.'.join(context)}' of type '{var_type}' has no field '{field}'"
                 )
+            context.append(field)
             scope = curr.data
-        return scope, target_var_name
+        return scope, context[-1]
     
     def do_assignment(self, statement_node: Element) -> None:
         """
@@ -410,41 +412,37 @@ class Interpreter(InterpreterBase):
 
     def init_new_struct(self, struct_type: str) -> Value:
         """
-        Given an uninitialized struct, initialize the dict according to the template
+        Given a type, return an initialized struct.
         """
         if struct_type not in self.structs:
             super().error(
                 ErrorType.TYPE_ERROR,
                 f"Undefined struct type '{struct_type}'"
             )
-        struct = Value(struct_type, {})
-        for field in self.structs[struct_type].get("fields"):
-            # We're not going to check for valid types here since the struct definitions are checked before the program starts
-            field_name, var_type = field.get("name"), field.get("var_type")
-            struct.data[field_name] = self.default_value(var_type)
-        return struct
+        return deepcopy(self.structs[struct_type])
 
     def evaluate_expression(self, expression_node: Element) -> Value:
         if "val" in expression_node.dict or expression_node.elem_type == "nil":
-            retval = self.get_value(expression_node)
+            return self.get_value(expression_node)
         elif expression_node.elem_type == "var":
-            retval = self.get_value_of_variable(expression_node)
+            return self.get_value_of_variable(expression_node)
         elif "op1" in expression_node.dict:
             if "op2" in expression_node.dict:
-                retval = self.evaluate_binary_operator(expression_node)
+                return self.evaluate_binary_operator(expression_node)
             else:
-                retval = self.evaluate_unary_operator(expression_node)
+                return self.evaluate_unary_operator(expression_node)
         elif expression_node.elem_type == "fcall":
             retval = self.do_func_call(expression_node)
+            if retval is None:
+                super().error(
+                    ErrorType.TYPE_ERROR,
+                    f"Attempted to evaluate void expression"
+                )
+            return retval
         elif expression_node.elem_type == "new":
             var_type = expression_node.get("var_type")
-            retval = self.init_new_struct(var_type)
-        if retval is None:
-            super().error(
-                ErrorType.TYPE_ERROR,
-                f"Attempted to evaluate void expression"
-            )
-        return retval
+            return self.init_new_struct(var_type)
+        
 
 
 def write_ast_to_json(program):
