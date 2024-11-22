@@ -13,9 +13,9 @@ class ScopeManager:
         The bool indicates whether this is a function-level scope or block-level scope
         The dict contains mappings to all the variables in that scope
         """
-        self.scopes: list[tuple[bool, dict[str, Value]]] = []
+        self.scopes: list[tuple[bool, dict[str, any]]] = []
 
-    def push(self, func_level: bool, scope: Optional[dict[str, Value]] = None) -> None:
+    def push(self, func_level: bool, scope: Optional[dict[str, any]] = None) -> None:
         """
         Method to call when entering a new scope.
 
@@ -42,10 +42,10 @@ class ScopeManager:
         _, scope = self.scopes[-1]
         if name in scope:
             return False
-        scope[name] = Value("nil", None)
+        scope[name] = None
         return True
 
-    def get_scope_of_var(self, name: str) -> Optional[dict[str, Value]]:
+    def get_scope_of_var(self, name: str) -> Optional[dict[str, any]]:
         """
         Iterate in reverse through the stack to find the variable.
         Stop when run out of scopes or when hit function-level scope.

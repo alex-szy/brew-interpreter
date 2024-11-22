@@ -1,5 +1,6 @@
 import json
 from typing import Optional
+from copy import deepcopy
 from intbase import InterpreterBase, ErrorType
 from element import Element
 from brewparse import parse_program
@@ -44,7 +45,7 @@ class Interpreter(InterpreterBase):
             super().error(ErrorType.NAME_ERROR, f"Function '{name}' is not defined")
         return self.funcs[name]
 
-    def run_func(self, func_node: Element, evaluated_args: list[Value]) -> tuple[Optional[Value], None] | tuple[None, tuple[ErrorType, str]]:
+    def run_func(self, func_node: Element, passed_args: list[Element | Value]) -> tuple[Optional[Element], None] | tuple[None, tuple[ErrorType, str]]:
         """
         Runs a function. Creates the scope for the function, runs the statements, then pops the scope and returns the return value.
 
@@ -52,18 +53,19 @@ class Interpreter(InterpreterBase):
         """
         # Check for correct number of arguments
         args = func_node.get("args")
-        if len(args) != len(evaluated_args):
+        if len(args) != len(passed_args):
             return None, (
                 ErrorType.NAME_ERROR,
-                f"Function {func_node.get('name')} expected {len(args)} arguments, got {len(evaluated_args)}"
+                f"Function {func_node.get('name')} expected {len(args)} arguments, got {len(passed_args)}"
             )
 
-        scope = {arg.get("name"): value for arg, value in zip(args, evaluated_args)}
+        scope = {arg.get("name"): expression for arg, expression in zip(args, passed_args)}
         # Push a func level scope for the arguments
         self.scope_manager.push(True, scope)
         # Push a block level scope for the function body
         self.scope_manager.push(False)
-        retval = self.run_statement_block(func_node.get("statements"))
+        # We don't want our cached values to persist between calls, so we make a copy of the func_node for each call
+        retval = self.run_statement_block(deepcopy(func_node).get("statements"))
         # Pop the 2 scopes we pushed for the function
         self.scope_manager.pop()
         self.scope_manager.pop()
@@ -86,10 +88,12 @@ class Interpreter(InterpreterBase):
         scope = self.scope_manager.get_scope_of_var(target_var_name)
         if scope is None:
             super().error(ErrorType.NAME_ERROR, f"Undefined variable '{target_var_name}'")
-        # TODO: Lazy evaluation
-        evaluated_expr = self.evaluate_expression(statement_node.get("expression"))
-        scope[target_var_name] = evaluated_expr
-
+        expression_node = statement_node.get("expression")
+        # We bind the lazily evaluated expression to the variable.
+        scope[target_var_name], _ = self.get_expression_lazy(expression_node)
+        # Invalidate the cache. TODO: Also need to recursively invalidate the cache of all expressions which point to this
+        if hasattr(expression_node, "cached_val"):
+            del expression_node.cached_val
 
     def do_func_call(self, statement_node: Element) -> Value:
         """
@@ -98,14 +102,15 @@ class Interpreter(InterpreterBase):
         For user-defined functions, attempt to call run_func on all functions which match the name.
         If none match, raise an error.
         """
-        evaluated_args = [self.evaluate_expression(x) for x in statement_node.get("args")]
-        name = statement_node.get("name")        
+        args = statement_node.get("args")
+        name = statement_node.get("name")
+        # We eagerly evaluate the arguments if this is a call to print or input.
         if name == "inputi" or name == "inputs":
-            match len(evaluated_args):
+            match len(args):
                 case 0:
                     pass
                 case 1:
-                    super().output(str(evaluated_args[0]))
+                    super().output(str(self.evaluate_expression(args[0])))
                 case other:
                     super().error(
                         ErrorType.NAME_ERROR,
@@ -116,20 +121,21 @@ class Interpreter(InterpreterBase):
             else:
                 return Value("string", super().get_input())
         elif name == "print":
-            super().output("".join([str(x) for x in evaluated_args]))
+            super().output("".join([str(self.evaluate_expression(x)) for x in args]))
             return Value("nil", None)
-        else:  # user defined functions
+        else:  # for user defined functions, we pass in the args but do not evaluate them.
             # try all the functions we find, execute the first one that matches the args
             for func in self.get_func_nodes(name):
                 # get_func_node guaranteed to return at least 1 element list
-                retval, error = self.run_func(func, evaluated_args)
+                bound_args = [self.get_expression_lazy(x)[0] for x in args]
+                retval, error = self.run_func(func, bound_args)
                 if error is None:
                     return Value("nil", None) if retval is None else retval
             err, msg = error
             super().error(err, msg)
             
 
-    def do_if_statement(self, statement_node: Element) -> Optional[Value]:
+    def do_if_statement(self, statement_node: Element) -> Optional[Element]:
         """
         Executes an `if` statement.
         1. Evaluate the condition.
@@ -150,7 +156,7 @@ class Interpreter(InterpreterBase):
 
         return retval
     
-    def do_for_statement(self, statement_node: Element) -> Optional[Value]:
+    def do_for_statement(self, statement_node: Element) -> Optional[Element]:
         """
         Executes a `for` statement.
         1. Run the init statement. Enter the loop.
@@ -179,7 +185,7 @@ class Interpreter(InterpreterBase):
                 return retval
             self.run_statement(statement_node.get("update"))
 
-    def do_return_statement(self, statement_node: Element) -> Optional[Value]:
+    def do_return_statement(self, statement_node: Element) -> Optional[Element]:
         """
         Executes a return statement.
         1. Evaluate the return expression, if there is one.
@@ -193,7 +199,7 @@ class Interpreter(InterpreterBase):
         self.ret_flag = True
         return retval
 
-    def run_statement(self, statement_node: Element) -> Optional[Value]:
+    def run_statement(self, statement_node: Element) -> Optional[Element]:
         """
         Runs a single statement.
         """
@@ -211,7 +217,7 @@ class Interpreter(InterpreterBase):
             case "return":
                 return self.do_return_statement(statement_node)
 
-    def run_statement_block(self, statement_block: list[Element]) -> Optional[Value]:
+    def run_statement_block(self, statement_block: list[Element]) -> Optional[Element]:
         """
         Runs a block of statements.
         After every statement is executed, check the return flag.
@@ -233,22 +239,33 @@ class Interpreter(InterpreterBase):
             return Value("nil", None)
         return Value(value_node.elem_type, val)
 
-    def get_value_of_variable(self, variable_node: Element) -> Value:
+    def get_value_of_variable(self, variable_node: Element) -> tuple[Element, Optional[tuple[ErrorType, str]]]:
         """
-        Attempt to get the value of a variable.
-        Raise an error if variable is not in scope.
+        Attempt to get the contents of a variable.
+        Returns an error if variable is not in scope.
         """
         target_var_name = variable_node.get("name")
         scope = self.scope_manager.get_scope_of_var(target_var_name)
         if scope is None:
-            super().error(ErrorType.NAME_ERROR, f"Undefined variable '{target_var_name}'")
-        return scope[target_var_name]            
+            return variable_node, (ErrorType.NAME_ERROR, f"Undefined variable '{target_var_name}'")
+        assert isinstance(scope[target_var_name], Element)
+        return scope[target_var_name], None
 
     def evaluate_binary_operator(self, expression_node: Element) -> Value:
         """
         Evaluates both operands, then performs the correct binary operation on them.
+        TODO: Implement shortcircuiting
         """
-        op1, op2 = [self.evaluate_expression(expression_node.get(x)) for x in ["op1", "op2"]]
+        # Evaluate the first operand
+        op1 = self.evaluate_expression(expression_node.get("op1"))
+        # If the operation is logical and/or, do shortcircuiting
+        if op1.type == "bool" and (expression_node.elem_type == "&&" or expression_node.elem_type == "||"):
+            if op1.data and expression_node.elem_type == "||":
+                return Value("bool", True)
+            if not op1.data and expression_node.elem_type == "&&":
+                return Value("bool", False)
+        # If shortcircuiting failed, or some other operation, evaluate the 2nd operand and proceed
+        op2 = self.evaluate_expression(expression_node.get("op2"))
         op = get_binary_operator(op1, op2, expression_node.elem_type)
         if op is None:
             super().error(
@@ -269,18 +286,76 @@ class Interpreter(InterpreterBase):
                 f"Unsupported operand type for unary {expression_node.elem_type}: {op1.type}"
             )
         return op(op1)
-
-    def evaluate_expression(self, expression_node: Element) -> Value:
-        if "val" in expression_node.dict or expression_node.elem_type == "nil":
-            return self.get_value(expression_node)
+    
+    def get_expression_lazy(self, expression_node: Element) -> tuple[Element, Optional[tuple[ErrorType, str]]]:
+        """
+        Resolve the expression by finding the variable referred to by the expression,
+        Or if a function call or operator, resolve the expressions in the arguments or operands.
+        If an error occurs and a variable is not found, don't error yet, just return the error.
+        The error will be thrown when the expression is eventually evaluated.
+        """
+        err = None
         if expression_node.elem_type == "var":
-            return self.get_value_of_variable(expression_node)
-        if "op1" in expression_node.dict:
+            # If a variable node, we replace the expression node with the expression bound to the variable
+            expression_node, err = self.get_value_of_variable(expression_node)
+        elif "op1" in expression_node.dict:
+            # If an operator, we bind the expressions to the operands
+            expr, err = self.get_expression_lazy(expression_node.get("op1"))
+            if err is None:
+                expression_node.dict["op1"] = expr
+                if "op2" in expression_node.dict:
+                    expr, err = self.get_expression_lazy(expression_node.get("op2"))
+                    if err is None:
+                        expression_node.dict["op2"] = expr
+        elif expression_node.elem_type == "fcall":
+            # If a function call, we bind the expressions to the arguments
+            for i in range(len(expression_node.get("args"))):
+                expr, err = self.get_expression_lazy(expression_node.get("args")[i])
+                if err is not None:
+                    break
+                expression_node.get("args")[i] = expr
+        # If any error, this would be a name error from an undefined variable. We don't want to error immediately, so set the error on the expression node.
+        # When we eventually do evaluate this expression node, then we throw the error.
+        if err is not None:
+            expression_node.error = err
+            return expression_node, err
+        # If a value node, this will not mutate, so we don't need to bind, just return the node
+        return expression_node, None
+
+    def evaluate_expression(self, expression_node: Optional[Element]) -> Value:
+        """
+        Actually evaluate the expression. Use the cached value if possible.
+        TODO: check all children for cache invalidation
+        """
+        # First, we check if the expression node has any errors when we bound it during lazy evaluation.
+        # If it does, we raise it.
+        if hasattr(expression_node, "error"):
+            err, msg = expression_node.error
+            super().error(err, msg)
+        # Next, we check if the expression has any cached value from when we possibly previously evaluated it.
+        if hasattr(expression_node, "cached_val"):
+            return expression_node.cached_val
+        # If there's no cached value, we evaluate the whole expression and cache the value.
+        if "val" in expression_node.dict or expression_node.elem_type == "nil":
+            expression_node.cached_val = self.get_value(expression_node)
+        elif expression_node.elem_type == "var":
+            var, err = self.get_value_of_variable(expression_node)
+            if err is not None:
+                error, msg = err
+                super().error(error, msg)
+            if var is None:
+                expression_node.cached_val = Value("nil", None)
+            else:
+                expression_node.cached_val = self.evaluate_expression(var)
+        elif "op1" in expression_node.dict:
             if "op2" in expression_node.dict:
-                return self.evaluate_binary_operator(expression_node)
-            return self.evaluate_unary_operator(expression_node)
-        if expression_node.elem_type == "fcall":
-            return self.do_func_call(expression_node)
+                expression_node.cached_val = self.evaluate_binary_operator(expression_node)
+            else:
+                expression_node.cached_val = self.evaluate_unary_operator(expression_node)
+        elif expression_node.elem_type == "fcall":
+            expression_node.cached_val = self.do_func_call(expression_node)
+        # Then we return it.
+        return expression_node.cached_val
 
 
 def write_ast_to_json(program):
