@@ -91,9 +91,8 @@ class Interpreter(InterpreterBase):
         expression_node = statement_node.get("expression")
         # We bind the lazily evaluated expression to the variable.
         scope[target_var_name], _ = self.get_expression_lazy(expression_node)
-        # Invalidate the cache. TODO: Also need to recursively invalidate the cache of all expressions which point to this
-        if hasattr(expression_node, "cached_val"):
-            del expression_node.cached_val
+        # When we do an assignment, we indicate that this expression may be evaluated multiple times and therefore, should be cached. We also invalidate any prior cached value
+        setattr(scope[target_var_name], "cached_val", None)
 
     def do_func_call(self, statement_node: Element) -> Value:
         """
@@ -298,22 +297,25 @@ class Interpreter(InterpreterBase):
         if expression_node.elem_type == "var":
             # If a variable node, we replace the expression node with the expression bound to the variable
             expression_node, err = self.get_value_of_variable(expression_node)
-        elif "op1" in expression_node.dict:
-            # If an operator, we bind the expressions to the operands
-            expr, err = self.get_expression_lazy(expression_node.get("op1"))
-            if err is None:
-                expression_node.dict["op1"] = expr
-                if "op2" in expression_node.dict:
-                    expr, err = self.get_expression_lazy(expression_node.get("op2"))
-                    if err is None:
-                        expression_node.dict["op2"] = expr
-        elif expression_node.elem_type == "fcall":
-            # If a function call, we bind the expressions to the arguments
-            for i in range(len(expression_node.get("args"))):
-                expr, err = self.get_expression_lazy(expression_node.get("args")[i])
-                if err is not None:
-                    break
-                expression_node.get("args")[i] = expr
+        else:
+            # We need a deepcopy of the expression node because if required, we need to rebind the expression on repeated assignments
+            expression_node = deepcopy(expression_node)
+            if "op1" in expression_node.dict:
+                # If an operator, we bind the expressions to the operands
+                expr, err = self.get_expression_lazy(expression_node.get("op1"))
+                if err is None:
+                    expression_node.dict["op1"] = expr
+                    if "op2" in expression_node.dict:
+                        expr, err = self.get_expression_lazy(expression_node.get("op2"))
+                        if err is None:
+                            expression_node.dict["op2"] = expr
+            elif expression_node.elem_type == "fcall":
+                # If a function call, we bind the expressions to the arguments
+                for i in range(len(expression_node.get("args"))):
+                    expr, err = self.get_expression_lazy(expression_node.get("args")[i])
+                    if err is not None:
+                        break
+                    expression_node.get("args")[i] = expr
         # If any error, this would be a name error from an undefined variable. We don't want to error immediately, so set the error on the expression node.
         # When we eventually do evaluate this expression node, then we throw the error.
         if err is not None:
@@ -333,29 +335,33 @@ class Interpreter(InterpreterBase):
             err, msg = expression_node.error
             super().error(err, msg)
         # Next, we check if the expression has any cached value from when we possibly previously evaluated it.
-        if hasattr(expression_node, "cached_val"):
+        to_cache = hasattr(expression_node, "cached_val")
+        if to_cache and expression_node.cached_val is not None:
             return expression_node.cached_val
         # If there's no cached value, we evaluate the whole expression and cache the value.
         if "val" in expression_node.dict or expression_node.elem_type == "nil":
-            expression_node.cached_val = self.get_value(expression_node)
+            result = self.get_value(expression_node)
         elif expression_node.elem_type == "var":
             var, err = self.get_value_of_variable(expression_node)
             if err is not None:
                 error, msg = err
                 super().error(error, msg)
             if var is None:
-                expression_node.cached_val = Value("nil", None)
+                result = Value("nil", None)
             else:
-                expression_node.cached_val = self.evaluate_expression(var)
+                result = self.evaluate_expression(var)
         elif "op1" in expression_node.dict:
             if "op2" in expression_node.dict:
-                expression_node.cached_val = self.evaluate_binary_operator(expression_node)
+                result = self.evaluate_binary_operator(expression_node)
             else:
-                expression_node.cached_val = self.evaluate_unary_operator(expression_node)
+                result = self.evaluate_unary_operator(expression_node)
         elif expression_node.elem_type == "fcall":
-            expression_node.cached_val = self.do_func_call(expression_node)
+            result = self.do_func_call(expression_node)
+        # Store the cached value if this expression is to be cached
+        if to_cache:
+            expression_node.cached_val = result
         # Then we return it.
-        return expression_node.cached_val
+        return result
 
 
 def write_ast_to_json(program):
