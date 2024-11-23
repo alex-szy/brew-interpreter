@@ -330,6 +330,9 @@ class Interpreter(InterpreterBase):
                 ErrorType.TYPE_ERROR,
                 f"Unsupported operand type(s) for binary {expression_node.elem_type}: {op1.type}, {op2.type}"
             )
+        # Divide by 0 exception
+        if expression_node.elem_type == "/" and op2.data == 0:
+            raise BrewinException("div0")
         return op(op1, op2)
 
     def evaluate_unary_operator(self, expression_node: Element) -> Value:
