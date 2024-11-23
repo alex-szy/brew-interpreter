@@ -94,7 +94,7 @@ class Interpreter(InterpreterBase):
         # When we do an assignment, we indicate that this expression may be evaluated multiple times and therefore, should be cached. We also invalidate any prior cached value
         setattr(scope[target_var_name], "cached_val", None)
 
-    def do_func_call(self, statement_node: Element) -> Value:
+    def do_func_call(self, statement_node: Element) -> Element | Value:
         """
         Execute a function call statement.
         The call can either be to a builtin function or a user-defined one.
@@ -129,7 +129,7 @@ class Interpreter(InterpreterBase):
                 bound_args = [self.get_expression_lazy(x)[0] for x in args]
                 retval, error = self.run_func(func, bound_args)
                 if error is None:
-                    return Value("nil", None) if retval is None else retval
+                    return retval
             err, msg = error
             super().error(err, msg)
             
@@ -194,7 +194,7 @@ class Interpreter(InterpreterBase):
         Otherwise, the function will not finish executing its statements.
         """
         expr = statement_node.get("expression")
-        retval = None if expr is None else self.evaluate_expression(expr)
+        retval = None if expr is None else self.get_expression_lazy(expr)[0]
         self.ret_flag = True
         return retval
 
@@ -327,8 +327,9 @@ class Interpreter(InterpreterBase):
     def evaluate_expression(self, expression_node: Optional[Element]) -> Value:
         """
         Actually evaluate the expression. Use the cached value if possible.
-        TODO: check all children for cache invalidation
         """
+        if expression_node is None:
+            return Value("nil", None)
         # First, we check if the expression node has any errors when we bound it during lazy evaluation.
         # If it does, we raise it.
         if hasattr(expression_node, "error"):
@@ -356,7 +357,11 @@ class Interpreter(InterpreterBase):
             else:
                 result = self.evaluate_unary_operator(expression_node)
         elif expression_node.elem_type == "fcall":
+            # Built in functions return values immediately
             result = self.do_func_call(expression_node)
+            # User-defined functions return lazy expressions
+            if not isinstance(result, Value):
+                result = self.evaluate_expression(result)
         # Store the cached value if this expression is to be cached
         if to_cache:
             expression_node.cached_val = result
