@@ -8,12 +8,15 @@ from utils import get_binary_operator, get_unary_operator, Value
 from scope_manager import ScopeManager
 
 
+class BrewinException(Exception):
+    pass
+
+
 class Interpreter(InterpreterBase):
     def __init__(self, console_output=True, inp=None, trace_output=False):
         super().__init__(console_output, inp)   # call InterpreterBase's constructor
         self.scope_manager = ScopeManager()
         self.ret_flag = False
-        self.exception = None
 
     def run(self, program: str) -> None:
         """
@@ -22,12 +25,13 @@ class Interpreter(InterpreterBase):
         ast = parse_program(program)         # parse program into AST
         self.do_func_defs(ast)
         del ast
-        # get_func_node guaranteed to return list with at least 1 element
-        self.run_func(self.get_func_nodes("main")[0], [])
-        if self.exception is not None:
+        try:
+            # get_func_node guaranteed to return list with at least 1 element
+            self.run_func(self.get_func_nodes("main")[0], [])
+        except BrewinException as e:
             super().error(
                 ErrorType.FAULT_ERROR,
-                f"Uncaught exception: '{self.exception}'"
+                f"Uncaught exception: '{e}'"
             )
 
     def do_func_defs(self, ast: Element) -> None:
@@ -115,10 +119,7 @@ class Interpreter(InterpreterBase):
                 case 0:
                     pass
                 case 1:
-                    evaluated_expr = self.evaluate_expression(args[0])
-                    if self.exception is not None:
-                        return Value("nil", None)
-                    super().output(str(evaluated_expr))
+                    super().output(str(self.evaluate_expression(args[0])))
                 case other:
                     super().error(
                         ErrorType.NAME_ERROR,
@@ -129,12 +130,8 @@ class Interpreter(InterpreterBase):
             else:
                 return Value("string", super().get_input())
         elif name == "print":
-            evaluated_exprs = []
-            for arg in args:
-                evaluated_exprs.append(self.evaluate_expression(arg))
-                if self.exception is not None:
-                    return Value("nil", None)
-            super().output("".join(map(str, evaluated_exprs)))
+            evaluated_exprs = [str(self.evaluate_expression(arg)) for arg in args]
+            super().output("".join(evaluated_exprs))
             return Value("nil", None)
         else:  # for user defined functions, we pass in the args but do not evaluate them.
             # try all the functions we find, execute the first one that matches the args
@@ -155,8 +152,6 @@ class Interpreter(InterpreterBase):
         2. Run either one of the 2 statement blocks.
         """
         evaluated_expr = self.evaluate_expression(statement_node.get("condition"))
-        if self.exception is not None:
-            return None
         if evaluated_expr.type != "bool":
             super().error(ErrorType.TYPE_ERROR, "Expression must be of type 'bool'")
 
@@ -183,12 +178,8 @@ class Interpreter(InterpreterBase):
         It is assumed that the init and update statements will not set the return flag under any circumstances.
         """
         self.run_statement(statement_node.get("init"))
-        if self.exception is not None:
-            return None
         while True:
             evaluated_expr = self.evaluate_expression(statement_node.get("condition"))
-            if self.exception is not None:
-                break
             if evaluated_expr.type != "bool":
                 super().error(ErrorType.TYPE_ERROR, "Expression must be of type 'bool'")
             if not evaluated_expr.data:
@@ -200,13 +191,9 @@ class Interpreter(InterpreterBase):
             # Pop the scope we pushed
             self.scope_manager.pop()
 
-            if self.exception is not None:
-                break
             if self.ret_flag:
                 return retval
             self.run_statement(statement_node.get("update"))
-            if self.exception is not None:
-                break
     
     def do_try_statement(self, statement_node: Element) -> Optional[Element]:
         """
@@ -216,22 +203,25 @@ class Interpreter(InterpreterBase):
         3. If an exception is raised in the block by a raise statement, look in the catchers for a suitable handler.
         4. If found, clear the exception and handle it.
         """
-        self.scope_manager.push(False)
-        retval = self.run_statement_block(statement_node.get("statements"))
-        self.scope_manager.pop()
-
-        if self.exception is not None:
+        try:
+            self.scope_manager.push(False)
+            retval = self.run_statement_block(statement_node.get("statements"))
+            self.scope_manager.pop()
+            if self.ret_flag:
+                return retval
+        except BrewinException as e:
+            self.scope_manager.pop()
+            caught = False
             for catcher in statement_node.get("catchers"):
-                if catcher.get("exception_type") != self.exception.data:
+                if catcher.get("exception_type") != str(e):
                     continue
-                self.exception = None
+                caught = True
                 self.scope_manager.push(False)
                 retval = self.run_statement_block(catcher.get("statements"))
                 self.scope_manager.pop()
                 break
-        
-        if self.ret_flag:
-            return retval
+            if not caught:
+                raise
 
     def do_return_statement(self, statement_node: Element) -> Optional[Element]:
         """
@@ -260,8 +250,7 @@ class Interpreter(InterpreterBase):
                 ErrorType.TYPE_ERROR,
                 f"Expected expression of type 'string' in raise statement, got '{exception.type}': '{exception.data}'"
             )
-        if self.exception is None:
-            self.exception = exception
+        raise BrewinException(exception.data)
 
     def run_statement(self, statement_node: Element) -> Optional[Element]:
         """
@@ -296,8 +285,6 @@ class Interpreter(InterpreterBase):
             return
         for statement_node in statement_block:
             retval = self.run_statement(statement_node)
-            if self.exception is not None:
-                break
             if self.ret_flag:
                 return retval
 
@@ -329,8 +316,6 @@ class Interpreter(InterpreterBase):
         """
         # Evaluate the first operand
         op1 = self.evaluate_expression(expression_node.get("op1"))
-        if self.exception is not None:
-            return Value("nil", None)
         # If the operation is logical and/or, do shortcircuiting
         if op1.type == "bool" and (expression_node.elem_type == "&&" or expression_node.elem_type == "||"):
             if op1.data and expression_node.elem_type == "||":
@@ -339,8 +324,6 @@ class Interpreter(InterpreterBase):
                 return Value("bool", False)
         # If shortcircuiting failed, or some other operation, evaluate the 2nd operand and proceed
         op2 = self.evaluate_expression(expression_node.get("op2"))
-        if self.exception is not None:
-            return Value("nil", None)
         op = get_binary_operator(op1, op2, expression_node.elem_type)
         if op is None:
             super().error(
@@ -354,8 +337,6 @@ class Interpreter(InterpreterBase):
         Evaluates the operand then performs the correct unary operation on it
         """
         op1 = self.evaluate_expression(expression_node.get("op1"))
-        if self.exception is not None:
-            return Value("nil", None)
         op = get_unary_operator(op1, expression_node.elem_type)
         if op is None:
             super().error(
@@ -429,8 +410,6 @@ class Interpreter(InterpreterBase):
         elif expression_node.elem_type == "fcall":
             # Built in functions return values immediately
             result = self.do_func_call(expression_node)
-            if self.exception is not None:
-                return Value("nil", None)
             # User-defined functions return lazy expressions
             if not isinstance(result, Value):
                 result = self.evaluate_expression(result)
